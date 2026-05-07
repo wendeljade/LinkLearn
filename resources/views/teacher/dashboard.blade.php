@@ -12,26 +12,32 @@
     </div>
 
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 3rem;">
-        <div class="card-modern" style="padding: 1.5rem;">
-            <h3 style="font-size: 1rem; font-weight: 800; color: var(--brand); margin-bottom: 1rem;">Classroom Management</h3>
-            <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">Oversee your active rooms and student activities.</p>
+        <div class="card-modern" style="padding: 1.5rem; display: flex; flex-direction: column; height: 100%;">
+            <div style="flex-grow: 1;">
+                <h3 style="font-size: 1rem; font-weight: 800; color: var(--brand); margin-bottom: 1rem;">Classroom Management</h3>
+                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">Oversee your active rooms and student activities.</p>
+            </div>
             <div style="background: var(--brand-soft); padding: 1rem; border-radius: 0.75rem; text-align: center; font-weight: 700;">
                 {{ $rooms->count() }} Active Rooms
             </div>
         </div>
 
-        <div class="card-modern" style="padding: 1.5rem;">
-            <h3 style="font-size: 1rem; font-weight: 800; color: var(--brand); margin-bottom: 1rem;">Payment Verification</h3>
-            <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">Review and unlock file access requests from students.</p>
+        <div class="card-modern" style="padding: 1.5rem; display: flex; flex-direction: column; height: 100%;">
+            <div style="flex-grow: 1;">
+                <h3 style="font-size: 1rem; font-weight: 800; color: var(--brand); margin-bottom: 1rem;">Payment Verification</h3>
+                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">Review and unlock file access requests from students.</p>
+            </div>
             <div style="background: #FEF3C7; color: #92400E; padding: 1rem; border-radius: 0.75rem; text-align: center; font-weight: 700;">
                 {{ $pendingCount ?? 0 }} Pending Requests
             </div>
         </div>
 
-        <div class="card-modern" style="padding: 1.5rem;">
-            <h3 style="font-size: 1rem; font-weight: 800; color: var(--brand); margin-bottom: 1rem;">Content Management</h3>
-            <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">Upload and organize your learning materials.</p>
-            <button class="btn btn-outline" style="width: 100%;">Upload New File</button>
+        <div class="card-modern" style="padding: 1.5rem; display: flex; flex-direction: column; height: 100%;">
+            <div style="flex-grow: 1;">
+                <h3 style="font-size: 1rem; font-weight: 800; color: var(--brand); margin-bottom: 1rem;">Content Management</h3>
+                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">Upload and organize your learning materials.</p>
+            </div>
+            <button class="btn btn-outline" style="width: 100%; padding: 1rem; border-radius: 0.75rem; font-weight: 700; display: flex; justify-content: center; align-items: center;">Upload New File</button>
         </div>
 
     </div>
@@ -116,6 +122,5 @@
             </div>
         </div>
     @endif
-    </div>
 </div>
 @endsection

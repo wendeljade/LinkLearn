@@ -1,11 +1,11 @@
 @extends('layouts.app')
 
-@section('title', 'Global Monitoring - LinkLearn')
+@section('title', 'Users - LinkLearn')
 
 @section('content')
 <div style="width: 100%; max-width: 1200px;">
     <div style="margin-bottom: 3rem;">
-        <h1 style="font-size: 2.5rem; font-weight: 800; color: var(--brand); letter-spacing: -0.04em; margin-bottom: 0.5rem;">Global Monitoring</h1>
+        <h1 style="font-size: 2.5rem; font-weight: 800; color: var(--brand); letter-spacing: -0.04em; margin-bottom: 0.5rem;">Users</h1>
         <p style="color: var(--text-muted); font-weight: 600;">Full overview of all platform members.</p>
     </div>
 

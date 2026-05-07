@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Organization;
+use App\Models\SupportTicket;
+use App\Models\SupportMessage;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,13 +22,79 @@ class AdminController extends Controller
         return response()->file($path);
     }
 
+    public function supportTickets(Request $request)
+    {
+        $query = SupportTicket::with(['user', 'organization'])->latest();
+
+        if ($request->has('status') && in_array($request->status, ['open', 'closed'])) {
+            $query->where('status', $request->status);
+        }
+
+        $tickets = $query->get();
+        return view('admin.support.index', compact('tickets'));
+    }
+
+    public function viewSupportTicket($id)
+    {
+        $ticket = SupportTicket::with(['user', 'organization', 'messages.user'])->findOrFail($id);
+        return view('admin.support.show', compact('ticket'));
+    }
+
+    public function replySupportTicket(Request $request, $id)
+    {
+        $ticket = SupportTicket::findOrFail($id);
+
+        if ($request->has('close_ticket') && $request->close_ticket == '1') {
+            $ticket->update(['status' => 'closed']);
+            return back()->with('success', 'Ticket closed successfully.');
+        }
+
+        if ($ticket->status === 'closed') {
+            return back()->with('error', 'This ticket is closed.');
+        }
+
+        $request->validate([
+            'message' => 'required|string',
+        ]);
+
+        $ticket->messages()->create([
+            'user_id' => auth()->id(),
+            'message' => $request->message,
+        ]);
+
+        return back()->with('success', 'Reply sent successfully.');
+    }
+
+    public function acknowledgeUpdate(Request $request)
+    {
+        if (!auth()->check()) {
+            abort(403);
+        }
+
+        $request->validate(['version' => 'required|string']);
+        
+        \Illuminate\Support\Facades\Cache::forever('user_acknowledged_version_' . auth()->id(), $request->version);
+        
+        return back()->with('success', 'System updated to ' . $request->version);
+    }
+
     public function dashboard()
     {
         $totalOrgs = \App\Models\Organization::count();
         $totalUsers = \App\Models\User::count();
         $totalTeachers = \App\Models\User::where('role', 'teacher')->count();
         $totalStudents = \App\Models\User::where('role', 'student')->count();
-        $totalActiveRooms = \App\Models\Room::where('status', 'open')->count();
+        $totalActiveRooms = 0;
+        $activeOrgs = \App\Models\Organization::where('status', 'active')->get();
+        foreach ($activeOrgs as $org) {
+            try {
+                tenancy()->initialize($org);
+                $totalActiveRooms += \App\Models\Room::where('status', '!=', 'archived')->count();
+                tenancy()->end();
+            } catch (\Exception $e) {
+                if (tenancy()->initialized) tenancy()->end();
+            }
+        }
 
         // Revenue Tracking: Total monthly tenant subscription income from organizations that have paid.
         $paidOrganizations = \App\Models\Organization::where('status', 'active')->count();

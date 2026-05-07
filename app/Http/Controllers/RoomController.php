@@ -507,6 +507,29 @@ class RoomController extends Controller
         return back()->with('success', 'Activity created successfully!');
     }
 
+    public function destroyActivity(Activity $activity)
+    {
+        $room = $activity->room;
+        if ($room->tutor_id !== auth()->id() && !auth()->user()->isAdmin()) {
+            abort(403);
+        }
+
+        // Delete associated files from storage
+        if ($activity->file_path) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($activity->file_path);
+        }
+
+        foreach($activity->submissions as $sub) {
+            if ($sub->file_path) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($sub->file_path);
+            }
+        }
+
+        $activity->delete();
+
+        return back()->with('success', 'Activity deleted successfully!');
+    }
+
     public function submitActivity(Request $request, Activity $activity)
     {
         $room = $activity->room;
@@ -623,13 +646,58 @@ class RoomController extends Controller
         return $room;
     }
 
-    public function previewFile(File $file) { return $this->downloadFile($file); }
-    public function previewFileOrg(File $file) { return $this->downloadFile($file); }
+    public function previewFile($file_id) { return $this->downloadFile($file_id); }
+    public function previewFileOrg(File $file) { return $this->downloadFileOrg($file); }
 
-    public function downloadFile(File $file)
+    public function downloadFile($file_id)
     {
+        $orgSlug = request('org_slug');
+        if ($orgSlug) {
+            $org = \App\Models\Organization::where('slug', $orgSlug)->firstOrFail();
+            tenancy()->initialize($org);
+            $file = File::findOrFail($file_id);
+            $this->authorizeFileAccess($file);
+            $response = Storage::disk('public')->download($file->file_path);
+            tenancy()->end();
+            return $response;
+        }
+
+        $file = File::findOrFail($file_id);
         $this->authorizeFileAccess($file);
         return Storage::disk('public')->download($file->file_path);
+    }
+
+    public function downloadActivityAttachment(Activity $activity)
+    {
+        $orgSlug = request('org_slug');
+        if ($orgSlug) {
+            $org = \App\Models\Organization::where('slug', $orgSlug)->firstOrFail();
+            tenancy()->initialize($org);
+            $activity = Activity::findOrFail($activity->id);
+            // Must be tutor, admin, or enrolled student
+            $room = $activity->room;
+            if ($room->tutor_id !== auth()->id() && !auth()->user()->isAdmin() && !$room->students()->where('user_id', auth()->id())->exists()) {
+                abort(403);
+            }
+            $response = Storage::disk('public')->download($activity->file_path);
+            tenancy()->end();
+            return $response;
+        }
+
+        $room = $activity->room;
+        if ($room->tutor_id !== auth()->id() && !auth()->user()->isAdmin() && !$room->students()->where('user_id', auth()->id())->exists()) {
+            abort(403);
+        }
+        return Storage::disk('public')->download($activity->file_path);
+    }
+
+    public function downloadActivityAttachmentOrg(Activity $activity)
+    {
+        $room = $activity->room;
+        if ($room->tutor_id !== auth()->id() && !auth()->user()->isAdmin() && auth()->user()->role !== 'org_admin' && !$room->students()->where('user_id', auth()->id())->exists()) {
+            abort(403);
+        }
+        return Storage::disk('public')->download($activity->file_path);
     }
 
     public function downloadFileOrg(File $file)

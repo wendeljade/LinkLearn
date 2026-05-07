@@ -267,14 +267,23 @@ class OrganizationController extends Controller
     public function team()
     {
         $org = tenant();
-        $org->load(['rooms.tutor', 'users']);
 
         if ($org->user_id !== auth()->id()) {
             abort(403);
         }
 
+        $tutorIds = \App\Models\Room::whereNotNull('tutor_id')->pluck('tutor_id');
+        $studentIds = \Illuminate\Support\Facades\DB::connection('tenant')->table('room_user')->pluck('user_id');
+
+        $userIds = collect([$org->user_id])
+            ->merge($tutorIds)
+            ->merge($studentIds)
+            ->unique();
+
+        $teamUsers = \App\Models\User::whereIn('id', $userIds)->get();
+
         $org_slug = $org->slug;
-        return view('tenant.team', compact('org', 'org_slug'));
+        return view('tenant.team', compact('org', 'org_slug', 'teamUsers'));
     }
 
     public function invite(Request $request)

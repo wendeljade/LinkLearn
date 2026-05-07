@@ -85,6 +85,19 @@
         .btn-primary { background: var(--brand); color: #fff; }
         .btn-accent { background: var(--accent); color: var(--brand); }
         .btn-outline { background: #fff; border: 2px solid var(--brand); color: var(--brand); }
+
+        /* Footer */
+        .app-footer { margin-top: auto; padding: 1.5rem 2rem; text-align: center; font-size: 0.875rem; color: var(--text-muted); border-top: 1px solid var(--border); }
+
+        /* Update Modal */
+        .update-modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+        .update-modal-overlay.show { opacity: 1; pointer-events: auto; }
+        .update-modal { background: #fff; width: 90%; max-width: 380px; border-radius: 1.5rem; padding: 2rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); transform: translateY(20px); transition: transform 0.3s ease; text-align: center; border: 1px solid var(--border); }
+        .update-modal-overlay.show .update-modal { transform: translateY(0); }
+        .update-icon { width: 3rem; height: 3rem; background: #fef3c7; color: #d97706; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; }
+        .update-title { font-size: 1.25rem; font-weight: 800; color: var(--brand); margin-bottom: 0.5rem; }
+        .update-desc { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.5; }
+        .update-version { background: var(--brand-soft); color: var(--brand); padding: 0.2rem 0.5rem; border-radius: 0.3rem; font-family: monospace; font-weight: 700; }
     </style>
 </head>
 <body>
@@ -137,14 +150,24 @@
             @if($user->isSuperAdmin())
                 <a href="{{ $isTenantContext ? $centralBase . '/dashboard' : route('dashboard') }}" class="nav-link {{ request()->is('dashboard*') ? 'active' : '' }}">Dashboard</a>
                 <a href="{{ $isTenantContext ? $centralBase . '/admin/organizations' : route('admin.organizations') }}" class="nav-link {{ request()->is('admin/organizations*') ? 'active' : '' }}">Tenants</a>
-                <a href="{{ $isTenantContext ? $centralBase . '/admin/monitoring' : route('admin.monitoring') }}" class="nav-link {{ request()->is('admin/monitoring*') ? 'active' : '' }}">Global Monitoring</a>
+                <a href="{{ $isTenantContext ? $centralBase . '/admin/monitoring' : route('admin.monitoring') }}" class="nav-link {{ request()->is('admin/monitoring*') ? 'active' : '' }}">Users</a>
+                <a href="{{ $isTenantContext ? $centralBase . '/admin/support' : route('admin.support.index') }}" class="nav-link {{ request()->is('admin/support*') ? 'active' : '' }}">Help and Support</a>
             @elseif($user->isTeacher())
                 <a href="{{ $dashboardLink }}" class="nav-link {{ request()->is('dashboard*') ? 'active' : '' }}">Dashboard</a>
-                <a href="{{ $classroomsLink }}" class="nav-link {{ request()->is('rooms') || request()->is('org/*/rooms') ? 'active' : '' }}">Classrooms</a>
+                <a href="{{ $classroomsLink }}" class="nav-link {{ request()->is('rooms*') || request()->is('org/*/rooms*') ? 'active' : '' }}">Classrooms</a>
                 <a href="{{ $archivedRoute }}" class="nav-link {{ request()->is('archived') ? 'active' : '' }}">Archived</a>
                 @if($currentOrg && $currentOrg->status !== 'active')
                     <a href="{{ $isTenantContext ? $centralBase . '/org/' . $currentOrg->slug . '/subscription/payment' : route('org.subscription.payment', $currentOrg->slug) }}" class="nav-link {{ request()->is('org/*/subscription/payment*') ? 'active' : '' }}">Pay Subscription</a>
                 @endif
+                <a href="{{ $isTenantContext ? $centralBase . '/support' : route('support.index') }}" class="nav-link {{ request()->is('support*') ? 'active' : '' }}">Help and Support</a>
+            @elseif($user->role === 'org_admin')
+                <a href="{{ $dashboardLink }}" class="nav-link {{ request()->is('dashboard*') ? 'active' : '' }}">Dashboard</a>
+                <a href="{{ $classroomsLink }}" class="nav-link {{ request()->is('rooms*') || request()->is('org/*/rooms*') ? 'active' : '' }}">Classrooms</a>
+                <a href="{{ $isTenantContext ? '/team' : route('org.team', ['tenant' => $orgSlug]) }}" class="nav-link {{ request()->is('team*') ? 'active' : '' }}">Teams</a>
+                @if($currentOrg && $currentOrg->status !== 'active')
+                    <a href="{{ $isTenantContext ? $centralBase . '/org/' . $currentOrg->slug . '/subscription/payment' : route('org.subscription.payment', $currentOrg->slug) }}" class="nav-link {{ request()->is('org/*/subscription/payment*') ? 'active' : '' }}">Pay Subscription</a>
+                @endif
+                <a href="{{ $isTenantContext ? $centralBase . '/support' : route('support.index') }}" class="nav-link {{ request()->is('support*') ? 'active' : '' }}">Help and Support</a>
             @else
                 {{-- Student and other roles --}}
                 <a href="{{ $dashboardLink }}" class="nav-link {{ request()->is('dashboard*') ? 'active' : '' }}">Dashboard</a>
@@ -152,6 +175,7 @@
                 @if($currentOrg && $currentOrg->status !== 'active')
                     <a href="{{ $isTenantContext ? $centralBase . '/org/' . $currentOrg->slug . '/subscription/payment' : route('org.subscription.payment', $currentOrg->slug) }}" class="nav-link {{ request()->is('org/*/subscription/payment*') ? 'active' : '' }}">Pay Subscription</a>
                 @endif
+                <a href="{{ $isTenantContext ? $centralBase . '/support' : route('support.index') }}" class="nav-link {{ request()->is('support*') ? 'active' : '' }}">Help and Support</a>
             @endif
         </nav>
     </aside>
@@ -187,7 +211,39 @@
         <main>
             @yield('content')
         </main>
+
+        @php
+            $currentVersion = auth()->check() ? \Illuminate\Support\Facades\Cache::get('user_acknowledged_version_' . auth()->id(), 'v1.0.0') : 'v1.0.0';
+        @endphp
+
+        <footer class="app-footer">
+            &copy; {{ date('Y') }} LinkLearn. All rights reserved.
+            @if(isset($currentVersion))
+                <span style="margin-left: 0.5rem;">Version: <strong style="color: var(--brand);" id="footerVersion">{{ $currentVersion }}</strong></span>
+            @endif
+        </footer>
     </div>
+
+    @if(isset($appVersion) && isset($currentVersion) && $appVersion !== $currentVersion && auth()->check())
+    <div class="update-modal-overlay" id="updateModal">
+        <div class="update-modal">
+            <div class="update-icon">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+            </div>
+            <h3 class="update-title">New Update Available!</h3>
+            <p class="update-desc">
+                We've just released <span class="update-version" id="updateVersionDisplay">{{ $appVersion }}</span>. <br>Enjoy the new features and improvements!
+            </p>
+            <div style="display: flex; gap: 0.5rem; flex-direction: column;">
+                @php
+                    $updateRoute = tenant() ? route('org.system.update', ['version' => $appVersion, 'tenant' => tenant('slug')]) : route('system.update', ['version' => $appVersion]);
+                @endphp
+                <a href="{{ $updateRoute }}" class="btn btn-primary" style="width: 100%; text-align: center;">Update Now</a>
+                <button class="btn" style="width: 100%; background: transparent; color: var(--text-muted); padding: 0.5rem;" id="updateLaterBtn">Update Later</button>
+            </div>
+        </div>
+    </div>
+    @endif
 
     <script>
         const profileBtn = document.getElementById('profileBtn');
@@ -198,6 +254,26 @@
                 profileMenu.classList.toggle('show');
             });
             document.addEventListener('click', () => profileMenu && profileMenu.classList.remove('show'));
+        }
+
+        const updateModal = document.getElementById('updateModal');
+        const updateLaterBtn = document.getElementById('updateLaterBtn');
+        const currentVersion = "{{ $appVersion ?? 'v1.0.0' }}";
+
+        if (updateModal && currentVersion !== 'v1.0.0') {
+            const sessionDismissed = sessionStorage.getItem('linklearn_update_dismissed');
+            if (sessionDismissed !== currentVersion) {
+                setTimeout(() => {
+                    updateModal.classList.add('show');
+                }, 500);
+            }
+        }
+
+        if (updateLaterBtn) {
+            updateLaterBtn.addEventListener('click', () => {
+                sessionStorage.setItem('linklearn_update_dismissed', currentVersion);
+                updateModal.classList.remove('show');
+            });
         }
     </script>
 </body>

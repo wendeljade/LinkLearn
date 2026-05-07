@@ -23,8 +23,8 @@
                                 <p style="margin: 0.4rem 0 0; color: var(--text-muted); font-size: 0.9rem;">{{ $purchase->file->room->subject_name }} • ₱{{ number_format($purchase->file->price, 2) }}</p>
                             </div>
                             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                                <a href="{{ route('rooms.preview-file', $purchase->file->id) }}" target="_blank" class="btn btn-outline" style="font-size: 0.85rem; padding: 0.6rem 1rem;">Preview</a>
-                                <a href="{{ route('rooms.download-file', $purchase->file->id) }}" class="btn btn-primary" style="font-size: 0.85rem; padding: 0.6rem 1rem;">Download</a>
+                                <a href="{{ route('rooms.preview-file', ['file' => $purchase->file->id, 'org_slug' => $purchase->org_slug]) }}" target="_blank" class="btn btn-outline" style="font-size: 0.85rem; padding: 0.6rem 1rem;">Preview</a>
+                                <a href="{{ route('rooms.download-file', ['file' => $purchase->file->id, 'org_slug' => $purchase->org_slug]) }}" class="btn btn-primary" style="font-size: 0.85rem; padding: 0.6rem 1rem;">Download</a>
                             </div>
                         </div>
                     @endforeach

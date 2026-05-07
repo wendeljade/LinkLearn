@@ -13,7 +13,6 @@
             <p style="color: var(--text-muted); font-weight: 600;">Classroom Monitoring & Management</p>
         </div>
         <div style="display: flex; gap: 0.75rem;">
-            <a href="/settings" class="btn btn-outline" style="padding: 0.6rem 1rem; font-size: 0.85rem; border-color: var(--border);">Settings</a>
             <a href="/team" class="btn btn-outline" style="padding: 0.6rem 1rem; font-size: 0.85rem; border-color: var(--border);">Team</a>
             @if(auth()->user()->role === 'org_admin' || auth()->user()->isAdmin())
                 <a href="{{ route('org.rooms.create') }}" class="btn btn-accent" style="padding: 0.6rem 1rem; font-size: 0.85rem;">+ Create Room</a>

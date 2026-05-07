@@ -6,7 +6,7 @@
 <div style="width: 100%; max-width: 1200px;">
     <div style="margin-bottom: 3.5rem;">
         <h1 style="font-size: 2.75rem; font-weight: 800; color: var(--brand); letter-spacing: -0.04em; margin-bottom: 0.5rem;">Super Admin Dashboard</h1>
-        <p style="color: var(--text-muted); font-weight: 600; font-size: 1.1rem;">Platform-Wide Management and Global Monitoring.</p>
+        <p style="color: var(--text-muted); font-weight: 600; font-size: 1.1rem;">Platform-Wide Management and Users.</p>
     </div>
 
     {{-- Dashboard Stats Cards --}}
@@ -113,7 +113,7 @@
 
         {{-- Global Monitoring Section --}}
         <div>
-            <h3 style="font-size: 1.5rem; font-weight: 800; color: var(--brand); margin-bottom: 2.5rem;">Global Monitoring</h3>
+            <h3 style="font-size: 1.5rem; font-weight: 800; color: var(--brand); margin-bottom: 2.5rem;">Users</h3>
             <div style="display: flex; flex-direction: column; gap: 2rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 1rem;">
                     <span style="font-size: 1.1rem; font-weight: 700; color: var(--brand);">Total Teachers</span>

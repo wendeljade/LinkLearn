@@ -113,6 +113,13 @@
                                 <div>
                                     <h3 style="font-size: 1.1rem; font-weight: 800; color: var(--brand); margin-bottom: 0.25rem;">{{ $activity->title }}</h3>
                                     <p style="font-size: 0.85rem; color: var(--text-muted);">Deadline: {{ $activity->deadline ? \Carbon\Carbon::parse($activity->deadline)->format('M d, Y h:i A') : 'No deadline' }}</p>
+                                    @if($isTutor)
+                                        <form action="{{ isset($org) ? route('org.rooms.activities.destroy', $activity->id) : route('rooms.activities.destroy', $activity->id) }}" method="POST" style="display: inline-block; margin-top: 0.5rem;" onsubmit="return confirm('Are you sure you want to delete this activity? This will also delete all student submissions.');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-outline" style="font-size: 0.75rem; padding: 0.25rem 0.75rem; color: #dc2626; border-color: #fca5a5;">Delete Activity</button>
+                                        </form>
+                                    @endif
                                 </div>
                                 @if($isStudent)
                                     @php $submission = $activity->submissions->first(); @endphp
@@ -135,7 +142,11 @@
                                     <span style="font-size: 1.25rem;">📎</span>
                                     <div>
                                         <p style="font-size: 0.85rem; font-weight: 700; color: var(--brand); margin: 0;">Attached Resource</p>
-                                        <a href="{{ asset('storage/' . $activity->file_path) }}" target="_blank" style="font-size: 0.8rem; color: var(--accent); font-weight: 600;">View Attachment</a>
+                                    @if(isset($org))
+                                        <a href="{{ route('org.rooms.activities.attachment', $activity->id) }}" target="_blank" style="font-size: 0.8rem; color: var(--accent); font-weight: 600;">View Attachment</a>
+                                    @else
+                                        <a href="{{ route('rooms.activities.attachment', ['activity' => $activity->id, 'org_slug' => $activity->room->organization->slug ?? '']) }}" target="_blank" style="font-size: 0.8rem; color: var(--accent); font-weight: 600;">View Attachment</a>
+                                    @endif
                                     </div>
                                 </div>
                             @endif

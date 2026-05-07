@@ -19,7 +19,17 @@ class DashboardController extends Controller
             $totalUsers = User::count();
             $totalTeachers = User::whereIn('role', ['teacher', 'tutor'])->count();
             $totalStudents = User::where('role', 'student')->count();
-            $totalActiveRooms = Room::where('status', 'open')->count();
+            $totalActiveRooms = 0;
+            $activeOrgs = Organization::where('status', 'active')->get();
+            foreach ($activeOrgs as $org) {
+                try {
+                    tenancy()->initialize($org);
+                    $totalActiveRooms += Room::where('status', '!=', 'archived')->count();
+                    tenancy()->end();
+                } catch (\Exception $e) {
+                    if (tenancy()->initialized) tenancy()->end();
+                }
+            }
             $paidTenants = Organization::where('status', 'active')->count();
             $totalIncome = $paidTenants * 999; // Monthly tenant subscription revenue
             
@@ -85,10 +95,8 @@ class DashboardController extends Controller
         }
 
         if ($user->isStudent()) {
-            $purchases = FilePurchase::where('user_id', $user->id)
-                ->where('status', 'completed')
-                ->with(['file.room'])
-                ->get();
+            // Purchases live in each tenant's DB — use the cross-DB helper
+            $purchases = $user->allPurchasedFiles();
 
             return view('student.dashboard', compact('purchases'));
         }

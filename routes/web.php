@@ -58,9 +58,16 @@ Route::get('/central-logout', function () {
     return redirect('/login');
 });
 
-Route::get('/support', function () {
-    return view('support');
-})->name('support');
+// Support Ticketing Routes (Central)
+Route::middleware(['auth'])->group(function () {
+    Route::get('/support', [\App\Http\Controllers\SupportTicketController::class, 'index'])->name('support.index');
+    Route::post('/support', [\App\Http\Controllers\SupportTicketController::class, 'store'])->name('support.store');
+    Route::get('/support/{id}', [\App\Http\Controllers\SupportTicketController::class, 'show'])->name('support.show');
+    Route::post('/support/{id}/reply', [\App\Http\Controllers\SupportTicketController::class, 'reply'])->name('support.reply');
+    
+    // System Update Acknowledgment (Accessible to all users)
+    Route::get('/system-update', [\App\Http\Controllers\AdminController::class, 'acknowledgeUpdate'])->name('system.update');
+});
 
 Route::middleware(['auth', 'role:super_admin'])->prefix('admin')->group(function () {
     Route::get('/', function () { return redirect()->route('admin.dashboard'); });
@@ -71,6 +78,11 @@ Route::middleware(['auth', 'role:super_admin'])->prefix('admin')->group(function
     Route::post('/organizations/{id}/approve', [AdminController::class, 'approve'])->name('admin.org.approve');
     Route::get('/monitoring', [AdminController::class, 'monitoring'])->name('admin.monitoring');
     Route::get('/proofs/{filename}', [AdminController::class, 'viewProof'])->name('admin.proofs.view');
+
+    // Admin Support Management
+    Route::get('/support', [AdminController::class, 'supportTickets'])->name('admin.support.index');
+    Route::get('/support/{id}', [AdminController::class, 'viewSupportTicket'])->name('admin.support.show');
+    Route::post('/support/{id}/reply', [AdminController::class, 'replySupportTicket'])->name('admin.support.reply');
 });
 
 /*
@@ -155,6 +167,8 @@ Route::middleware(['auth'])->group(function () {
 
     // Activity and Submission Routes (Global)
     Route::post('/rooms/{room}/activities', [RoomController::class, 'storeActivity'])->name('rooms.activities.store');
+    Route::get('/activities/{activity}/attachment', [RoomController::class, 'downloadActivityAttachment'])->name('rooms.activities.attachment');
+    Route::delete('/activities/{activity}', [RoomController::class, 'destroyActivity'])->name('rooms.activities.destroy');
     Route::post('/activities/{activity}/submit', [RoomController::class, 'submitActivity'])->name('rooms.activities.submit');
     Route::post('/submissions/{submission}/grade', [RoomController::class, 'gradeSubmission'])->name('rooms.activities.grade');
 });

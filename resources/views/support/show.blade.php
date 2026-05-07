@@ -1,0 +1,76 @@
+@extends('layouts.app')
+
+@section('title', 'Ticket: ' . $ticket->subject)
+
+@section('content')
+<div style="max-width: 900px; margin: auto; padding: 3rem 0;">
+    <div style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+            <a href="{{ request()->routeIs('org.*') ? route('org.support.index') : route('support.index') }}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--text-muted); text-decoration: none; font-weight: 600; margin-bottom: 1rem; transition: color 0.2s;">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                Back to Tickets
+            </a>
+            <h1 style="font-size: 2rem; font-weight: 800; color: var(--brand); line-height: 1.2;">{{ $ticket->subject }}</h1>
+            <p style="color: var(--text-muted); margin-top: 0.5rem; font-size: 0.9rem;">
+                Created {{ $ticket->created_at->format('M d, Y h:i A') }}
+            </p>
+        </div>
+        <div>
+            @if($ticket->status === 'open')
+                <span style="background: rgba(16, 185, 129, 0.1); color: #10B981; padding: 0.5rem 1rem; border-radius: 999px; font-size: 0.85rem; font-weight: 800;">Open</span>
+            @else
+                <span style="background: rgba(107, 114, 128, 0.1); color: #6B7280; padding: 0.5rem 1rem; border-radius: 999px; font-size: 0.85rem; font-weight: 800;">Closed</span>
+            @endif
+        </div>
+    </div>
+
+    <!-- Messages Thread -->
+    <div style="background: white; border-radius: 1.5rem; border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden;">
+        <div style="padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; max-height: 60vh; overflow-y: auto; background: #f8fafc;">
+            @foreach($ticket->messages as $message)
+                @php
+                    $isMine = $message->user_id === auth()->id();
+                    $isSuperAdmin = $message->user->role === 'super_admin';
+                @endphp
+                <div style="display: flex; {{ $isMine ? 'justify-content: flex-end;' : 'justify-content: flex-start;' }}">
+                    <div style="max-width: 75%; display: flex; flex-direction: column; {{ $isMine ? 'align-items: flex-end;' : 'align-items: flex-start;' }}">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; margin-bottom: 0.3rem; padding: 0 0.5rem;">
+                            {{ $isMine ? 'You' : ($isSuperAdmin ? 'Support Team' : $message->user->name) }} • {{ $message->created_at->diffForHumans() }}
+                        </span>
+                        <div style="padding: 1rem 1.25rem; border-radius: 1rem; font-size: 0.95rem; line-height: 1.5; {{ $isMine ? 'background: var(--brand); color: white; border-bottom-right-radius: 0.25rem;' : 'background: white; border: 1px solid var(--border); color: var(--text); border-bottom-left-radius: 0.25rem;' }}">
+                            {!! nl2br(e($message->message)) !!}
+                        </div>
+                    </div>
+                </div>
+            @endforeach
+        </div>
+
+        <!-- Reply Form -->
+        <div style="padding: 1.5rem; border-top: 1px solid var(--border); background: white;">
+            @if($ticket->status === 'open')
+                <form action="{{ request()->routeIs('org.*') ? route('org.support.reply', $ticket->id) : route('support.reply', $ticket->id) }}" method="POST">
+                    @csrf
+                    <div style="position: relative;">
+                        <textarea name="message" required class="form-input" style="width: 100%; padding: 1rem; padding-right: 6rem; border: 1px solid var(--border); border-radius: 1rem; min-height: 60px; resize: none;" placeholder="Type your reply here..."></textarea>
+                        <button type="submit" class="btn btn-primary" style="position: absolute; right: 0.5rem; bottom: 0.5rem; padding: 0.5rem 1rem; border-radius: 0.75rem;">Reply</button>
+                    </div>
+                </form>
+            @else
+                <div style="text-align: center; color: var(--text-muted); padding: 1rem; font-weight: 600; background: #f1f5f9; border-radius: 1rem;">
+                    This ticket has been closed. If you need further assistance, please open a new ticket.
+                </div>
+            @endif
+        </div>
+    </div>
+</div>
+
+<script>
+    // Auto-scroll to bottom of messages
+    document.addEventListener("DOMContentLoaded", function() {
+        const messagesContainer = document.querySelector('.max-height\\: 60vh');
+        if(messagesContainer) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+    });
+</script>
+@endsection

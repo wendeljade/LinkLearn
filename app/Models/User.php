@@ -204,9 +204,10 @@ public function allPendingRequests()
 
     // 2. Loop through ALL active organizations and query their tenant databases
     $orgs = \App\Models\Organization::where('status', 'active')->get();
-    
+    $prefix = config('tenancy.database.prefix', 'linklearn_org_');
+
     foreach ($orgs as $org) {
-        $tenantDb = config('database.connections.tenant.database') ?? 'linklearn_org_' . $org->slug;
+        $tenantDb = $prefix . $org->slug;
         $exists = \Illuminate\Support\Facades\DB::select(
             "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?",
             [$tenantDb]
@@ -264,7 +265,74 @@ public function allPendingRequests()
     return $allRequests;
 }
 
+/**
+ * Get all completed file purchases for this student across ALL tenant databases.
+ * Because file_purchases live in tenant DBs, we cross-query each org's database.
+ */
+public function allPurchasedFiles(): \Illuminate\Support\Collection
+{
+    $allPurchases = collect();
+    $prefix       = config('tenancy.database.prefix', 'linklearn_org_');
+    $orgs         = \App\Models\Organization::where('status', 'active')->get();
 
+    foreach ($orgs as $org) {
+        $tenantDb = $prefix . $org->slug;
+
+        $exists = \Illuminate\Support\Facades\DB::select(
+            "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?",
+            [$tenantDb]
+        );
+        if (empty($exists)) continue;
+
+        try {
+            $rows = \Illuminate\Support\Facades\DB::select(
+                "SELECT fp.*, f.title AS file_title, f.price AS file_price,
+                        f.file_path, r.subject_name AS room_name,
+                        ? AS org_slug, ? AS org_name
+                 FROM `{$tenantDb}`.`file_purchases` fp
+                 INNER JOIN `{$tenantDb}`.`files` f ON f.id = fp.file_id
+                 INNER JOIN `{$tenantDb}`.`rooms` r ON r.id = f.room_id
+                 WHERE fp.user_id = ? AND fp.status = 'completed'",
+                [$org->slug, $org->name, $this->id]
+            );
+
+            foreach ($rows as $row) {
+                $attrs = (array) $row;
+
+                // Hydrate FilePurchase model
+                $purchaseModel = (new \App\Models\FilePurchase())->newFromBuilder($attrs);
+                $purchaseModel->org_slug = $org->slug;
+
+                // Hydrate File model
+                $fileModel = (new \App\Models\File())->newFromBuilder([
+                    'id'        => $row->file_id,
+                    'room_id'   => null,
+                    'title'     => $row->file_title,
+                    'file_path' => $row->file_path,
+                    'price'     => $row->file_price,
+                ]);
+
+                // Hydrate Room model
+                $roomModel = (new \App\Models\Room())->newFromBuilder([
+                    'subject_name' => $row->room_name,
+                ]);
+                $roomModel->org_slug = $org->slug;
+                $roomModel->org_name = $org->name;
+
+                $fileModel->setRelation('room', $roomModel);
+                $purchaseModel->setRelation('file', $fileModel);
+
+                $allPurchases->push($purchaseModel);
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('allPurchasedFiles: skipping tenant ' . $org->slug, [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    return $allPurchases;
+}
 
 // Paghimo og helper functions para dali i-check ang role sa code
 public function isSuperAdmin() { return $this->role === 'super_admin'; }
