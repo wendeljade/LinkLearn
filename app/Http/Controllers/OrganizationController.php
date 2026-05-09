@@ -69,7 +69,7 @@ class OrganizationController extends Controller
         }
 
         if ($org->status === 'active') {
-            $domain = config('tenancy.central_domains')[1] ?? 'localhost';
+            $domain = request()->getHost();
             $port = request()->getPort();
             $portString = $port == 80 || $port == 443 ? '' : ':' . $port;
             return redirect(request()->getScheme() . "://{$org->slug}.{$domain}{$portString}/dashboard");
@@ -101,7 +101,7 @@ class OrganizationController extends Controller
         }
 
         if ($org->status === 'active') {
-            $domain = config('tenancy.central_domains')[1] ?? 'localhost';
+            $domain = request()->getHost();
             $port = request()->getPort();
             $portString = $port == 80 || $port == 443 ? '' : ':' . $port;
             return redirect(request()->getScheme() . "://{$org->slug}.{$domain}{$portString}/dashboard");

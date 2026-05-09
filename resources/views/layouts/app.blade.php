@@ -125,11 +125,13 @@
             $dashboardLink = $isTenantContext ? '/dashboard' : route('dashboard');
         }
 
+        // Define orgSlug globally for the view
+        $orgSlug = $currentOrg?->slug ?? $user->organization?->slug ?? request()->route('org_slug');
+
         // Classrooms link — teachers & students always go to the central aggregate list
         if ($isStudentOrTeacher) {
             $classroomsLink = $isTenantContext ? $centralBase . '/rooms' : route('rooms.index');
         } else {
-            $orgSlug = $currentOrg?->slug ?? $user->organization?->slug;
             $classroomsLink = $isTenantContext ? '/rooms'
                 : ($orgSlug ? route('org.rooms.index', ['tenant' => $orgSlug]) : route('rooms.index'));
         }
@@ -165,7 +167,7 @@
             @elseif($user->role === 'org_admin')
                 <a href="{{ $dashboardLink }}" class="nav-link {{ request()->is('dashboard*') ? 'active' : '' }}">Dashboard</a>
                 <a href="{{ $classroomsLink }}" class="nav-link {{ request()->is('rooms*') || request()->is('org/*/rooms*') ? 'active' : '' }}">Classrooms</a>
-                <a href="{{ $isTenantContext ? '/team' : route('org.team', ['tenant' => $orgSlug]) }}" class="nav-link {{ request()->is('team*') ? 'active' : '' }}">Teams</a>
+                <a href="{{ $isTenantContext ? '/team' : ($orgSlug ? route('org.team', ['tenant' => $orgSlug]) : '#') }}" class="nav-link {{ request()->is('team*') ? 'active' : '' }}">Teams</a>
                 @if($currentOrg && $currentOrg->status !== 'active')
                     <a href="{{ $isTenantContext ? $centralBase . '/org/' . $currentOrg->slug . '/subscription/payment' : route('org.subscription.payment', $currentOrg->slug) }}" class="nav-link {{ request()->is('org/*/subscription/payment*') ? 'active' : '' }}">Pay Subscription</a>
                 @endif
