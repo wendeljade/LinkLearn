@@ -261,8 +261,8 @@
         const currentVersion = "{{ $appVersion ?? 'v1.0.0' }}";
 
         if (updateModal && currentVersion !== 'v1.0.0') {
-            const sessionDismissed = sessionStorage.getItem('linklearn_update_dismissed');
-            if (sessionDismissed !== currentVersion) {
+            const localDismissed = localStorage.getItem('linklearn_update_dismissed');
+            if (localDismissed !== currentVersion) {
                 setTimeout(() => {
                     updateModal.classList.add('show');
                 }, 500);
@@ -271,7 +271,7 @@
 
         if (updateLaterBtn) {
             updateLaterBtn.addEventListener('click', () => {
-                sessionStorage.setItem('linklearn_update_dismissed', currentVersion);
+                localStorage.setItem('linklearn_update_dismissed', currentVersion);
                 updateModal.classList.remove('show');
             });
         }

@@ -73,9 +73,20 @@ class AdminController extends Controller
 
         $request->validate(['version' => 'required|string']);
         
+        try {
+            // Actually update the code via git pull
+            $output = shell_exec('git pull origin main 2>&1');
+            \Illuminate\Support\Facades\Log::info("System Update Git Pull: " . $output);
+            
+            // Clear caches to ensure new code takes effect
+            \Illuminate\Support\Facades\Artisan::call('optimize:clear');
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("System Update Failed: " . $e->getMessage());
+        }
+
         \Illuminate\Support\Facades\Cache::forever('user_acknowledged_version_' . auth()->id(), $request->version);
         
-        return back()->with('success', 'System updated to ' . $request->version);
+        return back()->with('success', 'System updated to ' . $request->version . '. ' . ($output ?? ''));
     }
 
     public function dashboard()
