@@ -195,6 +195,22 @@
                                 {{ auth()->user()->email }}
                             </strong>
                         </div>
+
+                        @php
+                            $currentVersion = \Illuminate\Support\Facades\Cache::get('system_current_version', 'v1.0.0');
+                        @endphp
+
+                        @if(isset($appVersion) && isset($currentVersion) && $appVersion !== $currentVersion)
+                            @php
+                                $updateRoute = function_exists('tenant') && tenant() ? route('org.system.update', ['version' => $appVersion, 'tenant' => tenant('slug')]) : route('system.update', ['version' => $appVersion]);
+                            @endphp
+                            <a href="{{ $updateRoute }}" class="dropdown-item" style="color: var(--accent); display: flex; justify-content: space-between; align-items: center; text-decoration: none;">
+                                <span>Update System</span>
+                                <span style="background: var(--brand-soft); color: var(--brand); padding: 0.2rem 0.5rem; border-radius: 0.3rem; font-size: 0.7rem; font-weight: 800;">{{ $appVersion }}</span>
+                            </a>
+                            <div style="height: 1px; background: var(--border); margin: 0.25rem 0;"></div>
+                        @endif
+
                         <form action="{{ (function_exists('tenant') && tenant()) ? route('org.logout') : route('logout') }}" method="POST">
                             @csrf
                             <button type="submit" class="dropdown-item" style="color: var(--danger);">Logout</button>
@@ -213,7 +229,7 @@
         </main>
 
         @php
-            $currentVersion = auth()->check() ? \Illuminate\Support\Facades\Cache::get('user_acknowledged_version_' . auth()->id(), 'v1.0.0') : 'v1.0.0';
+            $currentVersion = \Illuminate\Support\Facades\Cache::get('system_current_version', 'v1.0.0');
         @endphp
 
         <footer class="app-footer">
@@ -224,7 +240,7 @@
         </footer>
     </div>
 
-    @if(isset($appVersion) && isset($currentVersion) && $appVersion !== $currentVersion && auth()->check())
+    @if(isset($appVersion) && isset($currentVersion) && $appVersion !== $currentVersion)
     <div class="update-modal-overlay" id="updateModal">
         <div class="update-modal">
             <div class="update-icon">

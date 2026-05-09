@@ -68,15 +68,17 @@ class AdminController extends Controller
     public function acknowledgeUpdate(Request $request)
     {
         if (!auth()->check()) {
-            abort(403);
+            return redirect('/login');
         }
 
         $request->validate(['version' => 'required|string']);
         
         try {
-            // Actually update the code via git pull
-            $output = shell_exec('git pull origin main 2>&1');
-            \Illuminate\Support\Facades\Log::info("System Update Git Pull: " . $output);
+            // Actually update the code and run migrations via update.bat
+            $basePath = base_path();
+            $scriptPath = base_path('update.bat');
+            $output = shell_exec('cd "' . $basePath . '" && cmd.exe /c "' . $scriptPath . '" 2>&1');
+            \Illuminate\Support\Facades\Log::info("System Update Script Output: " . $output);
             
             // Clear caches to ensure new code takes effect
             \Illuminate\Support\Facades\Artisan::call('optimize:clear');
@@ -84,7 +86,7 @@ class AdminController extends Controller
             \Illuminate\Support\Facades\Log::error("System Update Failed: " . $e->getMessage());
         }
 
-        \Illuminate\Support\Facades\Cache::forever('user_acknowledged_version_' . auth()->id(), $request->version);
+        \Illuminate\Support\Facades\Cache::forever('system_current_version', $request->version);
         
         return back()->with('success', 'System updated to ' . $request->version . '. ' . ($output ?? ''));
     }
