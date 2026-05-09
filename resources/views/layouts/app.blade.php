@@ -152,6 +152,7 @@
                 <a href="{{ $isTenantContext ? $centralBase . '/admin/organizations' : route('admin.organizations') }}" class="nav-link {{ request()->is('admin/organizations*') ? 'active' : '' }}">Tenants</a>
                 <a href="{{ $isTenantContext ? $centralBase . '/admin/monitoring' : route('admin.monitoring') }}" class="nav-link {{ request()->is('admin/monitoring*') ? 'active' : '' }}">Users</a>
                 <a href="{{ $isTenantContext ? $centralBase . '/admin/support' : route('admin.support.index') }}" class="nav-link {{ request()->is('admin/support*') ? 'active' : '' }}">Help and Support</a>
+                <a href="#" onclick="document.getElementById('updateModal').classList.add('show'); return false;" class="nav-link">System Updates</a>
             @elseif($user->isTeacher())
                 <a href="{{ $dashboardLink }}" class="nav-link {{ request()->is('dashboard*') ? 'active' : '' }}">Dashboard</a>
                 <a href="{{ $classroomsLink }}" class="nav-link {{ request()->is('rooms*') || request()->is('org/*/rooms*') ? 'active' : '' }}">Classrooms</a>
@@ -160,6 +161,7 @@
                     <a href="{{ $isTenantContext ? $centralBase . '/org/' . $currentOrg->slug . '/subscription/payment' : route('org.subscription.payment', $currentOrg->slug) }}" class="nav-link {{ request()->is('org/*/subscription/payment*') ? 'active' : '' }}">Pay Subscription</a>
                 @endif
                 <a href="{{ $isTenantContext ? $centralBase . '/support' : route('support.index') }}" class="nav-link {{ request()->is('support*') ? 'active' : '' }}">Help and Support</a>
+                <a href="#" onclick="document.getElementById('updateModal').classList.add('show'); return false;" class="nav-link">System Updates</a>
             @elseif($user->role === 'org_admin')
                 <a href="{{ $dashboardLink }}" class="nav-link {{ request()->is('dashboard*') ? 'active' : '' }}">Dashboard</a>
                 <a href="{{ $classroomsLink }}" class="nav-link {{ request()->is('rooms*') || request()->is('org/*/rooms*') ? 'active' : '' }}">Classrooms</a>
@@ -168,6 +170,7 @@
                     <a href="{{ $isTenantContext ? $centralBase . '/org/' . $currentOrg->slug . '/subscription/payment' : route('org.subscription.payment', $currentOrg->slug) }}" class="nav-link {{ request()->is('org/*/subscription/payment*') ? 'active' : '' }}">Pay Subscription</a>
                 @endif
                 <a href="{{ $isTenantContext ? $centralBase . '/support' : route('support.index') }}" class="nav-link {{ request()->is('support*') ? 'active' : '' }}">Help and Support</a>
+                <a href="#" onclick="document.getElementById('updateModal').classList.add('show'); return false;" class="nav-link">System Updates</a>
             @else
                 {{-- Student and other roles --}}
                 <a href="{{ $dashboardLink }}" class="nav-link {{ request()->is('dashboard*') ? 'active' : '' }}">Dashboard</a>
@@ -176,6 +179,7 @@
                     <a href="{{ $isTenantContext ? $centralBase . '/org/' . $currentOrg->slug . '/subscription/payment' : route('org.subscription.payment', $currentOrg->slug) }}" class="nav-link {{ request()->is('org/*/subscription/payment*') ? 'active' : '' }}">Pay Subscription</a>
                 @endif
                 <a href="{{ $isTenantContext ? $centralBase . '/support' : route('support.index') }}" class="nav-link {{ request()->is('support*') ? 'active' : '' }}">Help and Support</a>
+                <a href="#" onclick="document.getElementById('updateModal').classList.add('show'); return false;" class="nav-link">System Updates</a>
             @endif
         </nav>
     </aside>
@@ -229,7 +233,12 @@
         </main>
 
         @php
-            $currentVersion = \Illuminate\Support\Facades\Cache::get('system_current_version', 'v1.0.0');
+            $currentVersion = 'v1.0.0';
+            if (tenant()) {
+                $currentVersion = \Illuminate\Support\Facades\Cache::get('tenant_version_' . tenant('id'), 'v1.0.0');
+            } else {
+                $currentVersion = \Illuminate\Support\Facades\Cache::get('central_version', 'v1.0.0');
+            }
         @endphp
 
         <footer class="app-footer">
@@ -240,23 +249,43 @@
         </footer>
     </div>
 
-    @if(isset($appVersion) && isset($currentVersion) && $appVersion !== $currentVersion)
+    @if(isset($appVersion) && isset($currentVersion))
     <div class="update-modal-overlay" id="updateModal">
         <div class="update-modal">
             <div class="update-icon">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
             </div>
-            <h3 class="update-title">New Update Available!</h3>
-            <p class="update-desc">
-                We've just released <span class="update-version" id="updateVersionDisplay">{{ $appVersion }}</span>. <br>Enjoy the new features and improvements!
-            </p>
-            <div style="display: flex; gap: 0.5rem; flex-direction: column;">
-                @php
-                    $updateRoute = tenant() ? route('org.system.update', ['version' => $appVersion, 'tenant' => tenant('slug')]) : route('system.update', ['version' => $appVersion]);
-                @endphp
-                <a href="{{ $updateRoute }}" class="btn btn-primary" style="width: 100%; text-align: center;">Update Now</a>
-                <button class="btn" style="width: 100%; background: transparent; color: var(--text-muted); padding: 0.5rem;" id="updateLaterBtn">Update Later</button>
-            </div>
+            @if($appVersion !== $currentVersion)
+                <h3 class="update-title">New Update Available!</h3>
+                <p class="update-desc">
+                    We've just released <span class="update-version" id="updateVersionDisplay">{{ $appVersion }}</span>. <br>Enjoy the new features and improvements!
+                </p>
+                <div style="display: flex; gap: 0.5rem; flex-direction: column;">
+                    @php
+                        $updateRoute = tenant() ? route('org.system.update', ['version' => $appVersion, 'tenant' => tenant('slug')]) : route('system.update', ['version' => $appVersion]);
+                        $canUpdate = false;
+                        if (tenant()) {
+                            $canUpdate = auth()->check() && auth()->user()->role === 'org_admin';
+                        } else {
+                            $canUpdate = auth()->check() && auth()->user()->isSuperAdmin();
+                        }
+                    @endphp
+                    @if($canUpdate)
+                        <a href="{{ $updateRoute }}" class="btn btn-primary" style="width: 100%; text-align: center;">Update Now</a>
+                    @else
+                        <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.5rem;">Please wait for your administrator to install the update.</p>
+                    @endif
+                    <button class="btn" style="width: 100%; background: transparent; color: var(--text-muted); padding: 0.5rem;" id="updateLaterBtn">Update Later</button>
+                </div>
+            @else
+                <h3 class="update-title">System is Up to Date</h3>
+                <p class="update-desc">
+                    You are currently running the latest version <span class="update-version">{{ $currentVersion }}</span>. No updates are required at this time.
+                </p>
+                <div style="display: flex; gap: 0.5rem; flex-direction: column;">
+                    <button class="btn btn-primary" style="width: 100%; text-align: center;" onclick="document.getElementById('updateModal').classList.remove('show')">Close</button>
+                </div>
+            @endif
         </div>
     </div>
     @endif
@@ -275,8 +304,9 @@
         const updateModal = document.getElementById('updateModal');
         const updateLaterBtn = document.getElementById('updateLaterBtn');
         const currentVersion = "{{ $appVersion ?? 'v1.0.0' }}";
+        const isUpdateAvailable = {{ (isset($appVersion) && isset($currentVersion) && $appVersion !== $currentVersion) ? 'true' : 'false' }};
 
-        if (updateModal && currentVersion !== 'v1.0.0') {
+        if (updateModal && isUpdateAvailable) {
             const localDismissed = localStorage.getItem('linklearn_update_dismissed');
             if (localDismissed !== currentVersion) {
                 setTimeout(() => {

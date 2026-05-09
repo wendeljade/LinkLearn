@@ -71,22 +71,51 @@ class AdminController extends Controller
             return redirect('/login');
         }
 
-        $request->validate(['version' => 'required|string']);
-        
-        try {
-            // Actually update the code and run migrations via update.bat
-            $basePath = base_path();
-            $scriptPath = base_path('update.bat');
-            $output = shell_exec('cd "' . $basePath . '" && cmd.exe /c "' . $scriptPath . '" 2>&1');
-            \Illuminate\Support\Facades\Log::info("System Update Script Output: " . $output);
-            
-            // Clear caches to ensure new code takes effect
-            \Illuminate\Support\Facades\Artisan::call('optimize:clear');
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("System Update Failed: " . $e->getMessage());
+        $user = auth()->user();
+
+        // Only Super Admin and Tenant Admin can acknowledge updates
+        if (!$user->isSuperAdmin() && $user->role !== 'org_admin') {
+            abort(403, 'Unauthorized action. Only administrators can perform updates.');
         }
 
-        \Illuminate\Support\Facades\Cache::forever('system_current_version', $request->version);
+        $request->validate(['version' => 'required|string']);
+        
+        $output = '';
+
+        if (tenant()) {
+            // Tenant Domain Update (Org Admin)
+            \Illuminate\Support\Facades\Cache::forever('tenant_version_' . tenant('id'), $request->version);
+            
+            // Note: We don't run update.bat here because it updates the global codebase and central DB for everyone.
+            // If true isolation is needed in the future, we would only run tenant-specific migrations here.
+            try {
+                \Illuminate\Support\Facades\Artisan::call('tenants:migrate', ['--tenants' => [tenant('id')], '--force' => true]);
+                \Illuminate\Support\Facades\Artisan::call('optimize:clear');
+                $output = "Tenant databases migrated.";
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("Tenant Update Failed: " . $e->getMessage());
+            }
+
+        } else {
+            // Central Domain Update (Super Admin)
+            if (!$user->isSuperAdmin()) {
+                abort(403);
+            }
+
+            \Illuminate\Support\Facades\Cache::forever('central_version', $request->version);
+
+            try {
+                // Actually update the global code and run central migrations
+                $basePath = base_path();
+                $scriptPath = base_path('update.bat');
+                $output = shell_exec('cd "' . $basePath . '" && cmd.exe /c "' . $scriptPath . '" 2>&1');
+                \Illuminate\Support\Facades\Log::info("System Update Script Output: " . $output);
+                
+                \Illuminate\Support\Facades\Artisan::call('optimize:clear');
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("System Update Failed: " . $e->getMessage());
+            }
+        }
         
         return back()->with('success', 'System updated to ' . $request->version . '. ' . ($output ?? ''));
     }
