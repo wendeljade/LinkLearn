@@ -83,6 +83,9 @@ Route::middleware(['auth', 'role:super_admin'])->prefix('admin')->group(function
     Route::get('/support', [AdminController::class, 'supportTickets'])->name('admin.support.index');
     Route::get('/support/{id}', [AdminController::class, 'viewSupportTicket'])->name('admin.support.show');
     Route::post('/support/{id}/reply', [AdminController::class, 'replySupportTicket'])->name('admin.support.reply');
+    
+    // Super Admin GCash QR Upload
+    Route::post('/gcash-qr', [AdminController::class, 'uploadGcashQr'])->name('admin.gcash.upload');
 });
 
 /*

@@ -63,12 +63,48 @@
                                 Awaiting Payment
                             </button>
                         @else
-                            <form action="{{ route('admin.org.toggle', $org->slug) }}" method="POST">
-                                @csrf
-                                <button type="submit" class="btn {{ $org->status === 'active' ? 'btn-outline' : 'btn-accent' }}" style="padding: 0.5rem 1rem; font-size: 0.75rem; border-color: {{ $org->status === 'active' ? '#ef4444' : 'var(--accent)' }}; color: {{ $org->status === 'active' ? '#ef4444' : 'var(--brand)' }};">
-                                    {{ $org->status === 'active' ? 'Disable' : 'Enable' }}
+                            @if($org->status === 'active')
+                                <button onclick="document.getElementById('disable-modal-{{ $org->slug }}').style.display='flex'" class="btn btn-outline" style="padding: 0.5rem 1rem; font-size: 0.75rem; border-color: #ef4444; color: #ef4444;">
+                                    Disable
                                 </button>
-                            </form>
+
+                                {{-- Disable Reason Modal --}}
+                                <div id="disable-modal-{{ $org->slug }}" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 1rem; text-align: left;">
+                                    <div style="background: #fff; width: 100%; max-width: 400px; border-radius: 1rem; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,.25);">
+                                        <div style="padding: 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                                            <h3 style="font-weight: 800; color: var(--brand); margin: 0; font-size: 1.1rem;">Disable Organization</h3>
+                                            <button onclick="document.getElementById('disable-modal-{{ $org->slug }}').style.display='none'" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+                                        </div>
+                                        <form action="{{ route('admin.org.toggle', $org->slug) }}" method="POST" style="padding: 1.5rem;">
+                                            @csrf
+                                            <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">Select the reason for disabling <strong>{{ $org->name }}</strong>.</p>
+                                            
+                                            <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem;">
+                                                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer;">
+                                                    <input type="radio" name="disable_reason" value="payment" required>
+                                                    Disabled due to missing monthly payment
+                                                </label>
+                                                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer;">
+                                                    <input type="radio" name="disable_reason" value="issue" required>
+                                                    Temporarily disabled for some issue
+                                                </label>
+                                            </div>
+
+                                            <div style="display: flex; gap: 0.75rem;">
+                                                <button type="button" onclick="document.getElementById('disable-modal-{{ $org->slug }}').style.display='none'" class="btn btn-outline" style="flex: 1;">Cancel</button>
+                                                <button type="submit" class="btn" style="flex: 1; background: #ef4444; color: white;">Confirm Disable</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            @else
+                                <form action="{{ route('admin.org.toggle', $org->slug) }}" method="POST">
+                                    @csrf
+                                    <button type="submit" class="btn btn-accent" style="padding: 0.5rem 1rem; font-size: 0.75rem; color: var(--brand);">
+                                        Enable
+                                    </button>
+                                </form>
+                            @endif
                         @endif
                         </div>
                     </td>

@@ -28,14 +28,18 @@ class IdentifyTenant
 
 // 4. THE KILL SWITCH: If status is not active, redirect org members to payment or block access
         if ($org->status !== 'active') {
+            if ($org->disable_reason === 'issue') {
+                return response()->view('errors.org-disabled', ['org' => $org]);
+            }
+
             if (auth()->check()) {
                 $user = auth()->user();
                 if ($user->id === $org->user_id || $user->organization_id === $org->id) {
                     return redirect()->route('org.subscription.payment', $slug);
                 }
             }
-        return response()->view('errors.subscription-expired');
-    }
+            return response()->view('errors.subscription-expired', ['org' => $org]);
+        }
 
     // 5. Share the current organization data with the request
     $request->merge(['current_org' => $org]);

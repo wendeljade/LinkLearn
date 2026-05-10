@@ -10,7 +10,7 @@
         </svg>
     </div>
     <h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.75rem;">Access Suspended</h1>
-    <p style="color: var(--text-muted); margin-bottom: 2rem;">The subscription for this organization has expired. Please contact your administrator to renew access.</p>
+    <p style="color: var(--text-muted); margin-bottom: 2rem;">This organization is Temporarily Disabled. Please contact your administrator or support for more information.</p>
     <div style="display: flex; flex-direction: column; gap: 0.75rem;">
         <a href="mailto:support@linklearn.com" class="btn btn-outline">Contact Support</a>
     </div>

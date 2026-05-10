@@ -54,6 +54,19 @@
                     <h2 style="font-size: 1rem; font-weight: 800; margin-bottom: 1rem;">Payment details</h2>
                     <p style="margin-bottom: 0.75rem; color: var(--text-muted);">Amount due: <strong>₱999</strong></p>
                     <p style="margin-bottom: 0.25rem; color: var(--text-muted);">Payment method: Bank transfer or online payment.</p>
+                    @if(file_exists(storage_path('app/public/admin/gcash_qr.png')))
+                        <div style="margin: 1.5rem 0; text-align: center; background: var(--brand-soft); padding: 1.5rem; border-radius: 1rem; border: 1px dashed #00b4d8;">
+                            <p style="font-size: 0.85rem; font-weight: 700; color: var(--brand); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">Scan to Pay via GCash</p>
+                            @php
+                                $centralDomains = config('tenancy.central_domains', ['localhost']);
+                                $centralDomain  = $centralDomains[0];
+                                $port = request()->getPort();
+                                $portStr = ($port && $port != 80 && $port != 443) ? ':' . $port : '';
+                                $qrUrl = request()->getScheme() . '://' . $centralDomain . $portStr . '/storage/admin/gcash_qr.png';
+                            @endphp
+                            <img src="{{ $qrUrl }}?v={{ time() }}" alt="Super Admin GCash QR" style="max-width: 250px; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);">
+                        </div>
+                    @endif
                     <p style="color: var(--text-muted); font-size: 0.95rem;">Upload proof of payment once you have completed the transaction. This will submit your payment for super admin review.</p>
 
                     <div style="margin-top: 1rem;">

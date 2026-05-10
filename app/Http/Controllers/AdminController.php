@@ -22,6 +22,17 @@ class AdminController extends Controller
         return response()->file($path);
     }
 
+    public function uploadGcashQr(Request $request)
+    {
+        $request->validate([
+            'gcash_qr_code' => 'required|image|max:5120',
+        ]);
+
+        $request->file('gcash_qr_code')->storeAs('admin', 'gcash_qr.png', 'central_public');
+
+        return back()->with('success', 'Super Admin GCash QR Code updated successfully.');
+    }
+
     public function supportTickets(Request $request)
     {
         $query = SupportTicket::with(['user', 'organization'])->latest();
@@ -171,17 +182,24 @@ class AdminController extends Controller
         return view('admin.organizations', compact('organizations'));
     }
 
-    public function toggleStatus($id)
+    public function toggleStatus(Request $request, $id)
     {
         $org = Organization::where('slug', $id)->firstOrFail();
 
         if ($org->status === 'active') {
             $org->status = 'deactive';
+            $org->disable_reason = $request->input('disable_reason');
             $notificationTitle = 'Organization Disabled';
             $notificationMessage = 'Your organization "' . $org->name . '" has been disabled by the system administrator.';
+            if ($org->disable_reason === 'payment') {
+                $notificationMessage .= ' Reason: Missing monthly payment.';
+            } elseif ($org->disable_reason === 'issue') {
+                $notificationMessage .= ' Reason: Temporarily disabled for an issue.';
+            }
             $notificationIcon = '⚠️';
         } elseif ($org->status === 'deactive') {
             $org->status = 'active';
+            $org->disable_reason = null;
             $notificationTitle = 'Organization Re-activated';
             $notificationMessage = 'Your organization "' . $org->name . '" has been re-activated by the system administrator.';
             $notificationIcon = '✅';

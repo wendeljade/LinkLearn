@@ -40,9 +40,7 @@
                     <a href="{{ route('login') }}" class="btn btn-accent" style="padding: 1rem 2.5rem;">Login to Enroll</a>
                 @endif
                 
-                <a href="{{ route('org.files') }}" class="btn btn-outline" style="padding: 1rem 2.5rem; border-color: var(--border);">
-                    Browse Public Materials
-                </a>
+
             </div>
         </div>
     </div>

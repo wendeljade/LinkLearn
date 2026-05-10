@@ -40,7 +40,7 @@ foreach (config('tenancy.central_domains') as $centralDomain) {
 
     Route::get('/magic-login/{token}', [\App\Http\Controllers\OrganizationController::class, 'magicLogin'])->name('org.magic.login');
 
-    Route::middleware(['auth'])->group(function () {
+    Route::middleware(['auth', \App\Http\Middleware\CheckTenantStatus::class])->group(function () {
         // Notifications
         Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('org.notifications.index');
         Route::post('/notifications/{notification}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('org.notifications.read');

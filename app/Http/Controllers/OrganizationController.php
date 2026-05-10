@@ -75,6 +75,10 @@ class OrganizationController extends Controller
             return redirect(request()->getScheme() . "://{$org->slug}.{$domain}{$portString}/dashboard");
         }
 
+        if ($org->status === 'deactive' && $org->disable_reason === 'issue') {
+            return view('errors.org-disabled', compact('org'));
+        }
+
         $statusMessage = null;
 
         if ($org->status === 'pending_approval') {

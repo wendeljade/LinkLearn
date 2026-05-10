@@ -96,6 +96,7 @@ class Organization extends BaseTenant implements TenantWithDatabase
         'cover_photo',
         'gcash_qr_code',
         'status',
+        'disable_reason',
         'subscription_paid_at',
         'proof_of_payment',
         'total_payments_made',

@@ -154,6 +154,7 @@
                 <a href="{{ $isTenantContext ? $centralBase . '/dashboard' : route('dashboard') }}" class="nav-link {{ request()->is('dashboard*') ? 'active' : '' }}">Dashboard</a>
                 <a href="{{ $isTenantContext ? $centralBase . '/admin/organizations' : route('admin.organizations') }}" class="nav-link {{ request()->is('admin/organizations*') ? 'active' : '' }}">Tenants</a>
                 <a href="{{ $isTenantContext ? $centralBase . '/admin/monitoring' : route('admin.monitoring') }}" class="nav-link {{ request()->is('admin/monitoring*') ? 'active' : '' }}">Users</a>
+                <a href="#" onclick="document.getElementById('superadmin-gcash-modal').style.display='flex'; return false;" class="nav-link">GCash QR Code</a>
                 <a href="{{ $isTenantContext ? $centralBase . '/admin/support' : route('admin.support.index') }}" class="nav-link {{ request()->is('admin/support*') ? 'active' : '' }}">Help and Support</a>
                 <a href="#" onclick="document.getElementById('updateModal').classList.add('show'); return false;" class="nav-link">System Updates</a>
             @elseif($user->isTeacher())
@@ -340,7 +341,7 @@
 {{-- GCash QR Code Management Modal --}}
 <div id="gcash-qr-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 1rem;">
     <div style="background: #fff; width: 100%; max-width: 420px; border-radius: 1rem; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,.25);">
-        <div style="padding: 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #00b4d8, #0077b6);">
+        <div style="padding: 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: var(--brand);">
             <div>
                 <h3 style="font-weight: 800; color: #fff; margin: 0; font-size: 1.1rem;">💳 GCash QR Code</h3>
                 <p style="color: rgba(255,255,255,0.8); font-size: 0.8rem; margin: 0.25rem 0 0;">Manage your organization's payment QR</p>
@@ -358,7 +359,7 @@
                         $portStr = ($port && $port != 80 && $port != 443) ? ':' . $port : '';
                         $qrUrl = request()->getScheme() . '://' . $centralDomain . $portStr . '/org-qr/' . $gcashOrg->slug;
                     @endphp
-                    <img src="{{ $qrUrl }}" alt="GCash QR Code" style="max-width: 200px; border-radius: 0.75rem; border: 3px solid #00b4d8; padding: 0.5rem;">
+                    <img src="{{ $qrUrl }}" alt="GCash QR Code" style="max-width: 200px; border-radius: 0.75rem; border: 3px solid var(--accent); padding: 0.5rem;">
                 </div>
             @else
                 <div style="border: 2px dashed #e2e8f0; border-radius: 0.75rem; padding: 2rem; text-align: center; margin-bottom: 1.25rem;">
@@ -373,7 +374,44 @@
                     {{ $gcashOrg->gcash_qr_code ? '🔄 Replace QR Code' : '⬆️ Upload QR Code' }}
                 </label>
                 <input type="file" name="gcash_qr_code" accept="image/*" required style="width: 100%; padding: 0.6rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; margin-bottom: 1rem; font-size: 0.85rem;">
-                <button type="submit" style="width: 100%; padding: 0.75rem; background: linear-gradient(135deg, #00b4d8, #0077b6); color: #fff; border: none; border-radius: 0.75rem; font-weight: 700; font-size: 0.9rem; cursor: pointer;">Save QR Code</button>
+                <button type="submit" style="width: 100%; padding: 0.75rem; background: var(--accent); color: var(--brand); border: none; border-radius: 0.75rem; font-weight: 800; font-size: 0.9rem; cursor: pointer;">Save QR Code</button>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
+
+@if($user->isSuperAdmin())
+{{-- Super Admin GCash QR Code Management Modal --}}
+<div id="superadmin-gcash-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 1rem;">
+    <div style="background: #fff; width: 100%; max-width: 420px; border-radius: 1rem; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,.25);">
+        <div style="padding: 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: var(--brand);">
+            <div>
+                <h3 style="font-weight: 800; color: #fff; margin: 0; font-size: 1.1rem;">💳 Platform GCash QR Code</h3>
+                <p style="color: rgba(255,255,255,0.8); font-size: 0.8rem; margin: 0.25rem 0 0;">For tenant subscription payments</p>
+            </div>
+            <button onclick="document.getElementById('superadmin-gcash-modal').style.display='none'" style="background: rgba(255,255,255,0.2); border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #fff; font-size: 1.2rem; display: flex; align-items: center; justify-content: center;">&times;</button>
+        </div>
+        <div style="padding: 1.5rem;">
+            @if(file_exists(storage_path('app/public/admin/gcash_qr.png')))
+                <div style="margin-bottom: 1.25rem; text-align: center;">
+                    <p style="font-size: 0.8rem; color: #64748b; font-weight: 600; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">Current QR Code</p>
+                    <img src="{{ asset('storage/admin/gcash_qr.png') }}?v={{ time() }}" alt="GCash QR Code" style="max-width: 200px; border-radius: 0.75rem; border: 3px solid var(--accent); padding: 0.5rem;">
+                </div>
+            @else
+                <div style="border: 2px dashed #e2e8f0; border-radius: 0.75rem; padding: 2rem; text-align: center; margin-bottom: 1.25rem;">
+                    <div style="font-size: 3rem; margin-bottom: 0.5rem;">📷</div>
+                    <p style="color: #94a3b8; font-size: 0.85rem; font-weight: 600;">No GCash QR Code uploaded yet</p>
+                </div>
+            @endif
+
+            <form action="{{ route('admin.gcash.upload') }}" method="POST" enctype="multipart/form-data">
+                @csrf
+                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-bottom: 0.5rem;">
+                    {{ file_exists(storage_path('app/public/admin/gcash_qr.png')) ? '🔄 Replace QR Code' : '⬆️ Upload QR Code' }}
+                </label>
+                <input type="file" name="gcash_qr_code" accept="image/*" required style="width: 100%; padding: 0.6rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; margin-bottom: 1rem; font-size: 0.85rem;">
+                <button type="submit" style="width: 100%; padding: 0.75rem; background: var(--accent); color: var(--brand); border: none; border-radius: 0.75rem; font-weight: 800; font-size: 0.9rem; cursor: pointer;">Save QR Code</button>
             </form>
         </div>
     </div>
