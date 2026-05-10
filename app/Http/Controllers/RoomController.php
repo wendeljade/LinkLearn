@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Activity;
+use App\Models\Announcement;
 use App\Models\File;
 use App\Models\Room;
 use App\Models\Submission;
@@ -79,6 +80,19 @@ class RoomController extends Controller
         }
 
         return view('rooms.index', compact('rooms'));
+    }
+
+    public function explore()
+    {
+        $user = auth()->user();
+        if (!$user->isStudent()) {
+            return redirect()->route('rooms.index');
+        }
+
+        $rooms = $user->allExploreRooms();
+        $isExplore = true;
+
+        return view('rooms.index', compact('rooms', 'isExplore'));
     }
 
     public function archived()
@@ -179,9 +193,9 @@ class RoomController extends Controller
         $org = $this->resolveOrg();
         $user = auth()->user();
         
-        // Allow SuperAdmin, OrgAdmin, and Teachers to create rooms
-        if (!$user->isAdmin() && $user->role !== 'org_admin' && !$user->isTeacher()) {
-            abort(403, 'Only organizations or teachers can create classrooms.');
+        // Allow SuperAdmin and OrgAdmin to create rooms only
+        if (!$user->isAdmin() && $user->role !== 'org_admin') {
+            abort(403, 'Only organization admins can create classrooms.');
         }
 
         if ($org) {
@@ -201,9 +215,9 @@ class RoomController extends Controller
     {
         $user = auth()->user();
 
-        // Allow SuperAdmin, OrgAdmin, and Teachers to create rooms
-        if (!$user->isAdmin() && $user->role !== 'org_admin' && !$user->isTeacher()) {
-            abort(403, 'Only organizations or teachers can create classrooms.');
+        // Allow SuperAdmin and OrgAdmin to create rooms only
+        if (!$user->isAdmin() && $user->role !== 'org_admin') {
+            abort(403, 'Only organization admins can create classrooms.');
         }
 
         $org = $this->resolveOrg();
@@ -279,40 +293,121 @@ class RoomController extends Controller
         return back()->with('success', 'Teacher successfully assigned to the classroom.');
     }
 
-    // 4. Join room as student
-    public function join(Room $room)
+    // 4. Join room as student (Request to Join)
+    public function join($roomOrId, $orgSlug = null)
     {
         $user = auth()->user();
-        
-        // Allow admins
-        if (!$user->isAdmin()) {
-            // If student doesn't have an organization, assign them to this room's org
-            $orgId = function_exists('tenant') && tenant() ? tenant('id') : $room->organization_id;
-            if (!$user->organization_id && $orgId) {
-                $user->update(['organization_id' => $orgId]);
-            }
-            
-            // Now check organization match
-            if ($orgId && $orgId !== $user->organization_id) {
-                abort(403, 'Unauthorized access to this organization\'s classrooms.');
-            }
-        }
 
-        $org = $this->resolveOrg();
-        if ($org) {
-            $orgId = function_exists('tenant') && tenant() ? tenant('id') : $room->organization_id;
-            if ($orgId && $orgId !== $org->id) {
-                abort(404);
+        if (!($roomOrId instanceof Room)) {
+            if ($orgSlug) {
+                $orgToInitialize = \App\Models\Organization::where('slug', $orgSlug)->firstOrFail();
+                tenancy()->initialize($orgToInitialize);
+                $room = Room::findOrFail($roomOrId);
+            } else {
+                $room = Room::findOrFail($roomOrId);
             }
+        } else {
+            $room = $roomOrId;
         }
 
         if ($room->tutor_id === auth()->id()) {
+            if (isset($orgToInitialize)) tenancy()->end();
             return back()->with('error', 'You are already the tutor for this classroom.');
         }
 
-        $room->students()->syncWithoutDetaching(auth()->id());
+        // Use allStudents() (no status filter) so syncWithoutDetaching works correctly
+        $room->allStudents()->syncWithoutDetaching([auth()->id() => ['status' => 'pending']]);
 
-        return back()->with('success', 'You have joined the classroom successfully!');
+        if ($room->tutor_id) {
+            \App\Models\Notification::create([
+                'user_id' => $room->tutor_id,
+                'type' => 'join_request',
+                'title' => 'New Join Request',
+                'message' => auth()->user()->name . ' requested to join your classroom "' . $room->subject_name . '".',
+                'icon' => '👋'
+            ]);
+        }
+
+        if (isset($orgToInitialize)) tenancy()->end();
+
+        return back()->with('success', 'Your request to join has been sent and is pending approval.');
+    }
+
+    public function approveJoin($roomId, $studentId)
+    {
+        $isTenantContext = function_exists('tenant') && tenant();
+        $room = $isTenantContext ? Room::findOrFail($roomId) : Room::findOrFail($roomId);
+
+        $isTutor = $room->tutor_id == auth()->id();
+        $isAdmin = auth()->user()->isAdmin() ||
+                   auth()->user()->role === 'org_admin';
+
+        if (!$isTutor && !$isAdmin) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        // Use allStudents() (no status filter) so updateExistingPivot can find the 'pending' row
+        $room->allStudents()->updateExistingPivot($studentId, ['status' => 'approved']);
+
+        \App\Models\Notification::create([
+            'user_id' => $studentId,
+            'type' => 'join_approved',
+            'title' => 'Request Approved',
+            'message' => 'Your request to join "' . $room->subject_name . '" has been approved.',
+            'icon' => '✅'
+        ]);
+
+        return back()->with('success', 'Student join request approved.');
+    }
+
+    public function rejectJoin($roomId, $studentId)
+    {
+        $isTenantContext = function_exists('tenant') && tenant();
+        $room = $isTenantContext ? Room::findOrFail($roomId) : Room::findOrFail($roomId);
+
+        $isTutor = $room->tutor_id == auth()->id();
+        $isAdmin = auth()->user()->isAdmin() ||
+                   auth()->user()->role === 'org_admin';
+
+        if (!$isTutor && !$isAdmin) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        // Use allStudents() (no status filter) so detach can find the 'pending' row
+        $room->allStudents()->detach($studentId);
+
+        \App\Models\Notification::create([
+            'user_id' => $studentId,
+            'type' => 'join_rejected',
+            'title' => 'Request Declined',
+            'message' => 'Your request to join "' . $room->subject_name . '" has been declined.',
+            'icon' => '❌'
+        ]);
+
+        return back()->with('success', 'Student join request rejected.');
+    }
+
+    public function removeStudent(Room $room, $studentId)
+    {
+        $isTutor = $room->tutor_id === auth()->id();
+        $isAdmin = auth()->user()->isAdmin() || auth()->user()->role === 'org_admin';
+
+        if (!$isTutor && !$isAdmin) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        // Detach the student from the room (works for any status)
+        $room->allStudents()->detach($studentId);
+
+        \App\Models\Notification::create([
+            'user_id' => $studentId,
+            'type'    => 'removed_from_room',
+            'title'   => 'Removed from Classroom',
+            'message' => 'You have been removed from the classroom "' . $room->subject_name . '".',
+            'icon'    => '🚫'
+        ]);
+
+        return back()->with('success', 'Student has been removed from the classroom.');
     }
 
     // 4.5. Seamless enter for multi-tenant setup using magic login
@@ -381,6 +476,11 @@ class RoomController extends Controller
             $activities = $room->activities()->with('submissions.student')->latest()->get();
         }
 
+        $pendingStudents = collect();
+        if ($isAdmin || $isTutor) {
+            $pendingStudents = $room->pendingStudents()->get();
+        }
+
         // Set routes for view — tenant routes don't take org slug param (subdomain handles it)
         $updateRoute       = $org ? route('org.rooms.update', $room->id) : route('rooms.update', $room->id);
         $inviteRoute       = $org ? route('org.rooms.invite', $room->id) : route('rooms.invite', $room->id);
@@ -394,7 +494,7 @@ class RoomController extends Controller
             : route('rooms.approve-purchase', [$room->id, ':purchase_id']);
         $activityStoreRoute = $org ? route('org.rooms.activities.store', $room->id) : route('rooms.activities.store', $room->id);
 
-        return view('rooms.show', compact('room', 'org', 'files', 'activities', 'isTutor', 'isAdmin', 'isStudent', 'updateRoute', 'inviteRoute', 'inviteTeacherRoute', 'uploadRoute', 'purchaseRouteTemplate', 'approveRouteTemplate', 'activityStoreRoute'));
+        return view('rooms.show', compact('room', 'org', 'files', 'activities', 'isTutor', 'isAdmin', 'isStudent', 'pendingStudents', 'updateRoute', 'inviteRoute', 'inviteTeacherRoute', 'uploadRoute', 'purchaseRouteTemplate', 'approveRouteTemplate', 'activityStoreRoute'));
     }
 
     public function update(Request $request, Room $room)
@@ -454,6 +554,15 @@ class RoomController extends Controller
             $student->update(['organization_id' => $orgId]);
         }
 
+        \App\Models\Notification::create([
+            'user_id' => $student->id,
+            'type' => 'room_invited',
+            'title' => 'Added to Classroom',
+            'message' => 'You have been added to the classroom "' . $room->subject_name . '".',
+            'link' => route('dashboard'),
+            'icon' => '🎓'
+        ]);
+
         return back()->with('success', 'Student successfully added to the classroom.');
     }
 
@@ -482,6 +591,54 @@ class RoomController extends Controller
         return back()->with('success', 'File uploaded successfully!');
     }
 
+    // Announcements Logic
+    public function storeAnnouncement(Request $request, Room $room)
+    {
+        if ($room->tutor_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $request->validate([
+            'content' => 'required|string',
+        ]);
+
+        $room->announcements()->create([
+            'content' => $request->content,
+        ]);
+
+        return back()->with('success', 'Announcement posted successfully!');
+    }
+
+    public function updateAnnouncement(Request $request, Announcement $announcement)
+    {
+        $room = $announcement->room;
+        if ($room->tutor_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $request->validate([
+            'content' => 'required|string',
+        ]);
+
+        $announcement->update([
+            'content' => $request->content,
+        ]);
+
+        return back()->with('success', 'Announcement updated successfully!');
+    }
+
+    public function destroyAnnouncement(Announcement $announcement)
+    {
+        $room = $announcement->room;
+        if ($room->tutor_id !== auth()->id() && !auth()->user()->isAdmin()) {
+            abort(403);
+        }
+
+        $announcement->delete();
+
+        return back()->with('success', 'Announcement deleted successfully!');
+    }
+
     // Activities Logic
     public function storeActivity(Request $request, Room $room)
     {
@@ -494,9 +651,12 @@ class RoomController extends Controller
             'description' => 'nullable|string',
             'deadline' => 'nullable|date',
             'file' => 'nullable|file|max:10240', // Max 10MB
+            'link' => 'nullable|url|max:255',
+            'allow_late_submissions' => 'boolean',
         ]);
 
-        $data = $request->only(['title', 'description', 'deadline']);
+        $data = $request->only(['title', 'description', 'deadline', 'link']);
+        $data['allow_late_submissions'] = $request->has('allow_late_submissions');
         
         if ($request->hasFile('file')) {
             $data['file_path'] = $request->file('file')->store('activities', 'public');
@@ -505,6 +665,38 @@ class RoomController extends Controller
         $room->activities()->create($data);
 
         return back()->with('success', 'Activity created successfully!');
+    }
+
+    public function updateActivity(Request $request, Activity $activity)
+    {
+        $room = $activity->room;
+        if ($room->tutor_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'deadline' => 'nullable|date',
+            'file' => 'nullable|file|max:10240',
+            'link' => 'nullable|url|max:255',
+            'allow_late_submissions' => 'boolean',
+        ]);
+
+        $data = $request->only(['title', 'description', 'deadline', 'link']);
+        $data['allow_late_submissions'] = $request->has('allow_late_submissions');
+
+        if ($request->hasFile('file')) {
+            // Delete old file if exists
+            if ($activity->file_path) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($activity->file_path);
+            }
+            $data['file_path'] = $request->file('file')->store('activities', 'public');
+        }
+
+        $activity->update($data);
+
+        return back()->with('success', 'Activity updated successfully!');
     }
 
     public function destroyActivity(Activity $activity)
@@ -537,6 +729,10 @@ class RoomController extends Controller
             abort(403);
         }
 
+        if ($activity->deadline && \Carbon\Carbon::now()->isAfter($activity->deadline) && !$activity->allow_late_submissions) {
+            return back()->with('error', 'The deadline for this activity has passed and late submissions are not allowed.');
+        }
+
         $request->validate([
             'file' => 'required|file|max:10240',
         ]);
@@ -567,13 +763,34 @@ class RoomController extends Controller
             'feedback' => $request->feedback,
         ]);
 
+        $isTenantContext = function_exists('tenant') && tenant();
+        $roomLink = $isTenantContext 
+            ? route('rooms.enter', ['room' => $submission->activity->room_id, 'org_slug' => tenant('slug')]) 
+            : route('rooms.show', $submission->activity->room_id);
+
+        \App\Models\Notification::create([
+            'user_id' => $submission->user_id,
+            'type' => 'submission_graded',
+            'title' => 'Activity Graded',
+            'message' => 'Your submission for "' . $submission->activity->title . '" has been graded: ' . $request->grade,
+            'link' => $roomLink,
+            'icon' => '⭐'
+        ]);
+
         return back()->with('success', 'Submission graded successfully!');
     }
 
     // 7. Pag-purchase og file
-    public function purchaseFile(Request $request, Room $room, $file_id)
+    public function purchaseFile(Request $request, Room $room, $file)
     {
-        $file = \App\Models\File::findOrFail($file_id);
+        \Illuminate\Support\Facades\Log::info('PURCHASE_FILE_HIT', [
+            'room'    => $room->id,
+            'file'    => $file,
+            'user'    => auth()->id(),
+            'has_file' => $request->hasFile('proof_of_payment'),
+        ]);
+
+        $fileModel = \App\Models\File::findOrFail($file);
         
         $request->validate([
             'proof_of_payment' => 'required|image|max:5120',
@@ -582,13 +799,32 @@ class RoomController extends Controller
         $path = $request->file('proof_of_payment')->store('proofs', 'public');
 
         \App\Models\FilePurchase::create([
-            'user_id' => auth()->id(),
-            'file_id' => $file->id,
-            'status' => 'pending',
+            'user_id'          => auth()->id(),
+            'file_id'          => $fileModel->id,
+            'status'           => 'pending',
             'proof_of_payment' => $path,
         ]);
 
-        return back()->with('success', 'Imong proof of payment na submit na. Paabot lang sa confirmation sa tutor.');
+        // Notify the teacher
+        if ($fileModel->room->tutor_id) {
+            $isTenantContext = function_exists('tenant') && tenant();
+            $roomLink = $isTenantContext
+                ? route('rooms.enter', ['room' => $fileModel->room_id, 'org_slug' => tenant('slug')])
+                : route('rooms.show', $fileModel->room_id);
+
+            \App\Models\Notification::create([
+                'user_id' => $fileModel->room->tutor_id,
+                'type'    => 'material_purchased',
+                'title'   => 'New Material Purchase',
+                'message' => auth()->user()->name . ' has submitted payment for "' . $fileModel->title . '".',
+                'link'    => $roomLink,
+                'icon'    => '💸'
+            ]);
+        }
+
+        return request()->wantsJson()
+            ? response()->json(['message' => 'Proof of payment submitted successfully.'], 200)
+            : back()->with('success', 'Your proof of payment has been submitted. Please wait for the tutor\'s confirmation.');
     }
 
     public function serveTenantProof($orgSlug, $path)
@@ -617,8 +853,7 @@ class RoomController extends Controller
             abort(403);
         }
 
-        $tenantPrefix = config('tenancy.filesystem.suffix_base', 'tenant') . tenant('slug');
-        $fullPath = storage_path("{$tenantPrefix}/app/public/{$path}");
+        $fullPath = storage_path("app/public/{$path}");
 
         if (!file_exists($fullPath)) {
             abort(404, 'Proof of payment file not found.');
@@ -646,8 +881,29 @@ class RoomController extends Controller
         return $room;
     }
 
-    public function previewFile($file_id) { return $this->downloadFile($file_id); }
-    public function previewFileOrg(File $file) { return $this->downloadFileOrg($file); }
+    public function previewFile($file_id)
+    {
+        $orgSlug = request('org_slug');
+        if ($orgSlug) {
+            $org = \App\Models\Organization::where('slug', $orgSlug)->firstOrFail();
+            tenancy()->initialize($org);
+            $file = File::findOrFail($file_id);
+            $this->authorizeFileAccess($file);
+            $response = response()->file(\Illuminate\Support\Facades\Storage::disk('public')->path($file->file_path));
+            tenancy()->end();
+            return $response;
+        }
+
+        $file = File::findOrFail($file_id);
+        $this->authorizeFileAccess($file);
+        return response()->file(\Illuminate\Support\Facades\Storage::disk('public')->path($file->file_path));
+    }
+
+    public function previewFileOrg(File $file)
+    {
+        $this->authorizeFileAccess($file);
+        return response()->file(\Illuminate\Support\Facades\Storage::disk('public')->path($file->file_path));
+    }
 
     public function downloadFile($file_id)
     {
@@ -665,6 +921,39 @@ class RoomController extends Controller
         $file = File::findOrFail($file_id);
         $this->authorizeFileAccess($file);
         return Storage::disk('public')->download($file->file_path);
+    }
+
+    public function previewActivityAttachment(Activity $activity)
+    {
+        $orgSlug = request('org_slug');
+        if ($orgSlug) {
+            $org = \App\Models\Organization::where('slug', $orgSlug)->firstOrFail();
+            tenancy()->initialize($org);
+            $activity = Activity::findOrFail($activity->id);
+            // Must be tutor, admin, or enrolled student
+            $room = $activity->room;
+            if ($room->tutor_id !== auth()->id() && !auth()->user()->isAdmin() && !$room->students()->where('user_id', auth()->id())->exists()) {
+                abort(403);
+            }
+            $response = response()->file(\Illuminate\Support\Facades\Storage::disk('public')->path($activity->file_path));
+            tenancy()->end();
+            return $response;
+        }
+
+        $room = $activity->room;
+        if ($room->tutor_id !== auth()->id() && !auth()->user()->isAdmin() && !$room->students()->where('user_id', auth()->id())->exists()) {
+            abort(403);
+        }
+        return response()->file(\Illuminate\Support\Facades\Storage::disk('public')->path($activity->file_path));
+    }
+
+    public function previewActivityAttachmentOrg(Activity $activity)
+    {
+        $room = $activity->room;
+        if ($room->tutor_id !== auth()->id() && !auth()->user()->isAdmin() && auth()->user()->role !== 'org_admin' && !$room->students()->where('user_id', auth()->id())->exists()) {
+            abort(403);
+        }
+        return response()->file(\Illuminate\Support\Facades\Storage::disk('public')->path($activity->file_path));
     }
 
     public function downloadActivityAttachment(Activity $activity)
@@ -700,6 +989,50 @@ class RoomController extends Controller
         return Storage::disk('public')->download($activity->file_path);
     }
 
+    public function previewSubmission(Submission $submission)
+    {
+        $orgSlug = request('org_slug');
+        if ($orgSlug) {
+            $org = \App\Models\Organization::where('slug', $orgSlug)->firstOrFail();
+            tenancy()->initialize($org);
+            $submission = Submission::findOrFail($submission->id);
+            if ($submission->activity->room->tutor_id !== auth()->id() && !auth()->user()->isAdmin()) abort(403);
+            $response = response()->file(\Illuminate\Support\Facades\Storage::disk('public')->path($submission->file_path));
+            tenancy()->end();
+            return $response;
+        }
+        if ($submission->activity->room->tutor_id !== auth()->id() && !auth()->user()->isAdmin()) abort(403);
+        return response()->file(\Illuminate\Support\Facades\Storage::disk('public')->path($submission->file_path));
+    }
+
+    public function downloadSubmission(Submission $submission)
+    {
+        $orgSlug = request('org_slug');
+        if ($orgSlug) {
+            $org = \App\Models\Organization::where('slug', $orgSlug)->firstOrFail();
+            tenancy()->initialize($org);
+            $submission = Submission::findOrFail($submission->id);
+            if ($submission->activity->room->tutor_id !== auth()->id() && !auth()->user()->isAdmin()) abort(403);
+            $response = Storage::disk('public')->download($submission->file_path);
+            tenancy()->end();
+            return $response;
+        }
+        if ($submission->activity->room->tutor_id !== auth()->id() && !auth()->user()->isAdmin()) abort(403);
+        return Storage::disk('public')->download($submission->file_path);
+    }
+
+    public function previewSubmissionOrg(Submission $submission)
+    {
+        if ($submission->activity->room->tutor_id !== auth()->id() && !auth()->user()->isAdmin() && auth()->user()->role !== 'org_admin') abort(403);
+        return response()->file(\Illuminate\Support\Facades\Storage::disk('public')->path($submission->file_path));
+    }
+
+    public function downloadSubmissionOrg(Submission $submission)
+    {
+        if ($submission->activity->room->tutor_id !== auth()->id() && !auth()->user()->isAdmin() && auth()->user()->role !== 'org_admin') abort(403);
+        return Storage::disk('public')->download($submission->file_path);
+    }
+
     public function downloadFileOrg(File $file)
     {
         $this->authorizeFileAccess($file);
@@ -716,6 +1049,16 @@ class RoomController extends Controller
 
         $purchase = \App\Models\FilePurchase::findOrFail($purchase_id);
         $purchase->update(['status' => 'completed']);
+
+        // Notify the student
+        \App\Models\Notification::create([
+            'user_id' => $purchase->user_id,
+            'type' => 'purchase_approved',
+            'title' => 'Purchase Approved',
+            'message' => 'Your purchase of "' . $purchase->file->title . '" has been verified. You can now access the file.',
+            'link' => route('dashboard'),
+            'icon' => '🔓'
+        ]);
 
         return back()->with('success', 'Purchase approved! The student can now access the file.');
     }

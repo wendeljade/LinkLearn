@@ -15,6 +15,8 @@ class Activity extends Model
         'description',
         'deadline',
         'file_path',
+        'link',
+        'allow_late_submissions',
     ];
 
     public function room()

@@ -42,21 +42,22 @@
                         <span style="color: var(--text-muted); font-size: 0.9rem;">{{ $org->created_at->format('M d, Y') }}</span>
                     </td>
                     <td style="padding: 1.5rem 2rem;">
-                        <span style="background: {{ $org->status === 'active' ? '#dcfce7' : ($org->status === 'pending_approval' ? '#fef3c7' : '#fee2e2') }}; color: {{ $org->status === 'active' ? '#15803d' : ($org->status === 'pending_approval' ? '#92400e' : '#b91c1c') }}; padding: 0.4rem 1rem; border-radius: 999px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase;">
+                        <span style="white-space: nowrap; background: {{ $org->status === 'active' ? '#dcfce7' : ($org->status === 'pending_approval' ? '#fef3c7' : '#fee2e2') }}; color: {{ $org->status === 'active' ? '#15803d' : ($org->status === 'pending_approval' ? '#92400e' : '#b91c1c') }}; padding: 0.4rem 1rem; border-radius: 999px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase;">
                             {{ str_replace('_', ' ', $org->status) }}
                         </span>
                     </td>
                     <td style="padding: 1.5rem 2rem; text-align: right;">
-                        @if($org->status === 'pending_approval')
-                            @if($org->proof_of_payment)
-                                <a href="{{ route('admin.proofs.view', basename($org->proof_of_payment)) }}" target="_blank" class="btn btn-outline" style="padding: 0.5rem 1rem; font-size: 0.75rem; margin-right: 0.5rem;">View Proof</a>
-                            @endif
-                            <form action="{{ route('admin.org.approve', $org->slug) }}" method="POST" style="display: inline;">
-                                @csrf
-                                <button type="submit" class="btn btn-accent" style="padding: 0.5rem 1rem; font-size: 0.75rem; color: var(--brand);">
-                                    Approve
-                                </button>
-                            </form>
+                        <div style="display: flex; gap: 0.5rem; justify-content: flex-end; align-items: center;">
+                            @if($org->status === 'pending_approval')
+                                @if($org->proof_of_payment)
+                                    <a href="{{ route('admin.proofs.view', basename($org->proof_of_payment)) }}" target="_blank" class="btn btn-outline" style="padding: 0.5rem 1rem; font-size: 0.75rem; white-space: nowrap;">View Proof</a>
+                                @endif
+                                <form action="{{ route('admin.org.approve', $org->slug) }}" method="POST" style="margin: 0;">
+                                    @csrf
+                                    <button type="submit" class="btn btn-accent" style="padding: 0.5rem 1rem; font-size: 0.75rem; color: var(--brand); white-space: nowrap;">
+                                        Approve
+                                    </button>
+                                </form>
                         @elseif($org->status === 'pending_payment')
                             <button class="btn btn-outline" disabled style="padding: 0.5rem 1rem; font-size: 0.75rem; color: var(--text-muted); border-color: var(--border);">
                                 Awaiting Payment
@@ -69,6 +70,7 @@
                                 </button>
                             </form>
                         @endif
+                        </div>
                     </td>
                 </tr>
                 @endforeach

@@ -139,16 +139,30 @@ Route::middleware(['auth'])->group(function () {
 |--------------------------------------------------------------------------
 */
 
+// Public route to serve GCash QR code images (no auth - it's just a static image)
+Route::get('/org-qr/{slug}', [OrganizationController::class, 'serveGcashQr'])
+    ->name('org.gcash.serve');
+
 Route::middleware(['auth'])->group(function () {
+    // Notifications
+    Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{notification}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('notifications.read');
+    Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+    Route::delete('/notifications/{notification}', [\App\Http\Controllers\NotificationController::class, 'destroy'])->name('notifications.destroy');
+
+    Route::get('/rooms/explore', [RoomController::class, 'explore'])->name('rooms.explore');
     Route::get('/rooms', [RoomController::class, 'index'])->name('rooms.index');
-    Route::get('/rooms/create', [RoomController::class, 'create'])->middleware(['role:admin,teacher,tutor'])->name('rooms.create');
-    Route::post('/rooms', [RoomController::class, 'store'])->middleware(['role:admin,teacher,tutor'])->name('rooms.store');
+    Route::get('/rooms/create', [RoomController::class, 'create'])->middleware(['role:admin'])->name('rooms.create');
+    Route::post('/rooms', [RoomController::class, 'store'])->middleware(['role:admin'])->name('rooms.store');
     
     // Central entry route for seamless tenant redirection via magic login
     Route::get('/rooms/{room}/enter/{org_slug}', [RoomController::class, 'enterTenant'])->name('rooms.enter');
     
     Route::get('/rooms/{room}', [RoomController::class, 'show'])->name('rooms.show');
-    Route::post('/rooms/{room}/join', [RoomController::class, 'join'])->name('rooms.join');
+    Route::post('/rooms/{room_id}/join/{org_slug?}', [RoomController::class, 'join'])->name('rooms.join');
+    Route::post('/rooms/{room}/approve-student/{student}', [RoomController::class, 'approveJoin'])->name('rooms.approve-student');
+    Route::post('/rooms/{room}/reject-student/{student}', [RoomController::class, 'rejectJoin'])->name('rooms.reject-student');
+    Route::delete('/rooms/{room}/remove-student/{student}', [RoomController::class, 'removeStudent'])->name('rooms.remove-student');
     Route::put('/rooms/{room}', [RoomController::class, 'update'])->name('rooms.update');
     Route::post('/rooms/{room}/invite', [RoomController::class, 'inviteStudent'])->name('rooms.invite');
     Route::post('/rooms/{room}/invite-teacher', [RoomController::class, 'inviteTeacher'])->name('rooms.invite-teacher');
@@ -165,11 +179,21 @@ Route::middleware(['auth'])->group(function () {
         ->where('path', '.*')
         ->name('rooms.tenant-proof');
 
+
+    // Announcement Routes (Global)
+    Route::post('/rooms/{room}/announcements', [RoomController::class, 'storeAnnouncement'])->name('rooms.announcements.store');
+    Route::put('/announcements/{announcement}', [RoomController::class, 'updateAnnouncement'])->name('rooms.announcements.update');
+    Route::delete('/announcements/{announcement}', [RoomController::class, 'destroyAnnouncement'])->name('rooms.announcements.destroy');
+
     // Activity and Submission Routes (Global)
     Route::post('/rooms/{room}/activities', [RoomController::class, 'storeActivity'])->name('rooms.activities.store');
+    Route::put('/activities/{activity}', [RoomController::class, 'updateActivity'])->name('rooms.activities.update');
+    Route::get('/activities/{activity}/preview-attachment', [RoomController::class, 'previewActivityAttachment'])->name('rooms.activities.preview-attachment');
     Route::get('/activities/{activity}/attachment', [RoomController::class, 'downloadActivityAttachment'])->name('rooms.activities.attachment');
     Route::delete('/activities/{activity}', [RoomController::class, 'destroyActivity'])->name('rooms.activities.destroy');
     Route::post('/activities/{activity}/submit', [RoomController::class, 'submitActivity'])->name('rooms.activities.submit');
+    Route::get('/submissions/{submission}/preview', [RoomController::class, 'previewSubmission'])->name('rooms.submissions.preview');
+    Route::get('/submissions/{submission}/download', [RoomController::class, 'downloadSubmission'])->name('rooms.submissions.download');
     Route::post('/submissions/{submission}/grade', [RoomController::class, 'gradeSubmission'])->name('rooms.activities.grade');
 });
     });

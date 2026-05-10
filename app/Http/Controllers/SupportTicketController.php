@@ -36,6 +36,19 @@ class SupportTicketController extends Controller
             'message' => $request->message,
         ]);
 
+        // Notify super admins
+        $superAdmins = \App\Models\User::where('role', 'super_admin')->get();
+        foreach ($superAdmins as $superAdmin) {
+            \App\Models\Notification::create([
+                'user_id' => $superAdmin->id,
+                'type' => 'support_ticket_created',
+                'title' => 'New Support Ticket',
+                'message' => auth()->user()->name . ' opened a new support ticket: "' . $request->subject . '".',
+                'link' => route('admin.support.show', $ticket->id),
+                'icon' => '🎫'
+            ]);
+        }
+
         return redirect()->route(request()->routeIs('org.*') ? 'org.support.show' : 'support.show', $ticket->id)
             ->with('success', 'Support ticket created successfully. We will get back to you soon.');
     }
@@ -63,6 +76,19 @@ class SupportTicketController extends Controller
             'user_id' => auth()->id(),
             'message' => $request->message,
         ]);
+
+        // Notify super admins
+        $superAdmins = \App\Models\User::where('role', 'super_admin')->get();
+        foreach ($superAdmins as $superAdmin) {
+            \App\Models\Notification::create([
+                'user_id' => $superAdmin->id,
+                'type' => 'support_ticket_replied',
+                'title' => 'New Support Ticket Reply',
+                'message' => auth()->user()->name . ' replied to the support ticket: "' . $ticket->subject . '".',
+                'link' => route('admin.support.show', $ticket->id),
+                'icon' => '💬'
+            ]);
+        }
 
         return back()->with('success', 'Reply sent successfully.');
     }

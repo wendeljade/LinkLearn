@@ -50,9 +50,14 @@
             @if($ticket->status === 'open')
                 <form action="{{ request()->routeIs('org.*') ? route('org.support.reply', $ticket->id) : route('support.reply', $ticket->id) }}" method="POST">
                     @csrf
-                    <div style="position: relative;">
-                        <textarea name="message" required class="form-input" style="width: 100%; padding: 1rem; padding-right: 6rem; border: 1px solid var(--border); border-radius: 1rem; min-height: 60px; resize: none;" placeholder="Type your reply here..."></textarea>
-                        <button type="submit" class="btn btn-primary" style="position: absolute; right: 0.5rem; bottom: 0.5rem; padding: 0.5rem 1rem; border-radius: 0.75rem;">Reply</button>
+                    <div style="display: flex; align-items: center; gap: 0.75rem; background: #f1f5f9; padding: 0.5rem; border-radius: 999px;">
+                        <input type="text" name="message" required class="form-input" style="flex-grow: 1; padding: 0.75rem 1.25rem; border: none; background: transparent; outline: none; font-size: 0.95rem; box-shadow: none;" placeholder="Type your reply here..." autocomplete="off">
+                        <button type="submit" style="background: var(--brand); color: white; width: 40px; height: 40px; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; flex-shrink: 0;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'" title="Send">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: translateX(-1px) translateY(1px);">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
                     </div>
                 </form>
             @else

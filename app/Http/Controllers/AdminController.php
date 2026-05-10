@@ -46,6 +46,16 @@ class AdminController extends Controller
 
         if ($request->has('close_ticket') && $request->close_ticket == '1') {
             $ticket->update(['status' => 'closed']);
+
+            \App\Models\Notification::create([
+                'user_id' => $ticket->user_id,
+                'type' => 'support_ticket_closed',
+                'title' => 'Support Ticket Closed',
+                'message' => 'Your support ticket "' . $ticket->subject . '" has been closed by the admin.',
+                'link' => route('support.show', $ticket->id),
+                'icon' => '🔒'
+            ]);
+
             return back()->with('success', 'Ticket closed successfully.');
         }
 
@@ -60,6 +70,15 @@ class AdminController extends Controller
         $ticket->messages()->create([
             'user_id' => auth()->id(),
             'message' => $request->message,
+        ]);
+
+        \App\Models\Notification::create([
+            'user_id' => $ticket->user_id,
+            'type' => 'support_ticket_admin_reply',
+            'title' => 'Admin Replied to Ticket',
+            'message' => 'An admin has replied to your support ticket: "' . $ticket->subject . '".',
+            'link' => route('support.show', $ticket->id),
+            'icon' => '👨‍💻'
         ]);
 
         return back()->with('success', 'Reply sent successfully.');
@@ -84,17 +103,15 @@ class AdminController extends Controller
 
         if (tenant()) {
             // Tenant Domain Update (Org Admin)
-            \Illuminate\Support\Facades\Cache::forever('tenant_version_' . tenant('id'), $request->version);
-            
-            // Note: We don't run update.bat here because it updates the global codebase and central DB for everyone.
-            // If true isolation is needed in the future, we would only run tenant-specific migrations here.
             try {
                 \Illuminate\Support\Facades\Artisan::call('tenants:migrate', ['--tenants' => [tenant('id')], '--force' => true]);
                 \Illuminate\Support\Facades\Artisan::call('optimize:clear');
-                $output = "Tenant databases migrated.";
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::error("Tenant Update Failed: " . $e->getMessage());
             }
+
+            // Set cache AFTER optimize:clear so it isn't immediately wiped
+            \Illuminate\Support\Facades\Cache::forever('tenant_version_' . tenant('id'), $request->version);
 
         } else {
             // Central Domain Update (Super Admin)
@@ -102,22 +119,22 @@ class AdminController extends Controller
                 abort(403);
             }
 
-            \Illuminate\Support\Facades\Cache::forever('central_version', $request->version);
-
             try {
                 // Actually update the global code and run central migrations
                 $basePath = base_path();
                 $scriptPath = base_path('update.bat');
-                $output = shell_exec('cd "' . $basePath . '" && cmd.exe /c "' . $scriptPath . '" 2>&1');
-                \Illuminate\Support\Facades\Log::info("System Update Script Output: " . $output);
+                shell_exec('cd "' . $basePath . '" && cmd.exe /c "' . $scriptPath . '" 2>&1');
                 
                 \Illuminate\Support\Facades\Artisan::call('optimize:clear');
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::error("System Update Failed: " . $e->getMessage());
             }
+
+            // Set cache AFTER optimize:clear so it isn't immediately wiped
+            \Illuminate\Support\Facades\Cache::forever('central_version', $request->version);
         }
         
-        return back()->with('success', 'System updated to ' . $request->version . '. ' . ($output ?? ''));
+        return back()->with('success', 'System successfully updated to ' . $request->version);
     }
 
     public function dashboard()
@@ -139,8 +156,8 @@ class AdminController extends Controller
         }
 
         // Revenue Tracking: Total monthly tenant subscription income from organizations that have paid.
-        $paidOrganizations = \App\Models\Organization::where('status', 'active')->count();
-        $totalIncome = $paidOrganizations * 999;
+        $totalPaymentsMade = \App\Models\Organization::sum('total_payments_made');
+        $totalIncome = $totalPaymentsMade * 999;
 
         $recentOrganizations = \App\Models\Organization::with('owner')->latest()->take(5)->get();
         $pendingOrganizations = \App\Models\Organization::where('status', 'pending_approval')->with('owner')->get();
@@ -160,13 +177,29 @@ class AdminController extends Controller
 
         if ($org->status === 'active') {
             $org->status = 'deactive';
+            $notificationTitle = 'Organization Disabled';
+            $notificationMessage = 'Your organization "' . $org->name . '" has been disabled by the system administrator.';
+            $notificationIcon = '⚠️';
         } elseif ($org->status === 'deactive') {
             $org->status = 'active';
+            $notificationTitle = 'Organization Re-activated';
+            $notificationMessage = 'Your organization "' . $org->name . '" has been re-activated by the system administrator.';
+            $notificationIcon = '✅';
         } else {
             return back()->with('error', 'Only active or disabled organizations can be toggled here.');
         }
 
         $org->save();
+
+        if ($org->user_id) {
+            \App\Models\Notification::create([
+                'user_id' => $org->user_id,
+                'type' => 'org_status_changed',
+                'title' => $notificationTitle,
+                'message' => $notificationMessage,
+                'icon' => $notificationIcon
+            ]);
+        }
 
         return back()->with('success', 'Organization status updated successfully.');
     }
@@ -219,8 +252,22 @@ class AdminController extends Controller
             }
         }
 
-        // Mark org as active AFTER provisioning succeeds
-        $org->update(['status' => 'active']);
+        // Mark org as active AFTER provisioning succeeds and record the payment
+        $org->update([
+            'status' => 'active',
+            'total_payments_made' => $org->total_payments_made + 1
+        ]);
+
+        if ($org->user_id) {
+            \App\Models\Notification::create([
+                'user_id' => $org->user_id,
+                'type' => 'org_approved',
+                'title' => 'Organization Approved 🎉',
+                'message' => 'Your organization "' . $org->name . '" has been approved! You can now start creating classrooms.',
+                'link' => route('dashboard'), // They can go to dashboard to see it
+                'icon' => '🏢'
+            ]);
+        }
 
         return back()->with('success', "Organization approved! Tenant database provisioned. They can now access: {$org->slug}.localhost:8000");
     }
@@ -230,36 +277,33 @@ class AdminController extends Controller
         $rawTeachers = User::where('role', 'teacher')->with('organization')->latest()->get();
         $rawStudents = User::where('role', 'student')->with('organization')->latest()->get();
 
+        // Build a deduplicated list: one entry per user, with all orgs attached
         $teachers = collect();
         foreach ($rawTeachers as $teacher) {
-            $taughtRooms = $teacher->allTaughtRooms();
-            $orgsTeachingIn = $taughtRooms->pluck('organization')->unique('id');
+            $taughtRooms   = $teacher->allTaughtRooms();
+            $orgsTeachingIn = $taughtRooms->pluck('organization')->filter()->unique('id')->values();
 
-            if ($orgsTeachingIn->isEmpty()) {
-                $teachers->push($teacher);
-            } else {
-                foreach ($orgsTeachingIn as $org) {
-                    $clonedTeacher = clone $teacher;
-                    $clonedTeacher->setRelation('organization', $org);
-                    $teachers->push($clonedTeacher);
-                }
+            // If no rooms/orgs found, fallback to their registered org (if any)
+            if ($orgsTeachingIn->isEmpty() && $teacher->organization) {
+                $orgsTeachingIn = collect([$teacher->organization]);
             }
+
+            $teacher->all_organizations = $orgsTeachingIn;
+            $teachers->push($teacher);
         }
 
         $students = collect();
         foreach ($rawStudents as $student) {
-            $joinedRooms = $student->allJoinedRooms();
-            $orgsStudyingIn = $joinedRooms->pluck('organization')->unique('id');
+            $joinedRooms    = $student->allJoinedRooms();
+            $orgsStudyingIn = $joinedRooms->pluck('organization')->filter()->unique('id')->values();
 
-            if ($orgsStudyingIn->isEmpty()) {
-                $students->push($student);
-            } else {
-                foreach ($orgsStudyingIn as $org) {
-                    $clonedStudent = clone $student;
-                    $clonedStudent->setRelation('organization', $org);
-                    $students->push($clonedStudent);
-                }
+            // If no rooms/orgs found, fallback to their registered org (if any)
+            if ($orgsStudyingIn->isEmpty() && $student->organization) {
+                $orgsStudyingIn = collect([$student->organization]);
             }
+
+            $student->all_organizations = $orgsStudyingIn;
+            $students->push($student);
         }
 
         return view('admin.monitoring', compact('teachers', 'students'));

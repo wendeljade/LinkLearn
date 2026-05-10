@@ -34,10 +34,12 @@
 
         <div class="card-modern" style="padding: 1.5rem; display: flex; flex-direction: column; height: 100%;">
             <div style="flex-grow: 1;">
-                <h3 style="font-size: 1rem; font-weight: 800; color: var(--brand); margin-bottom: 1rem;">Content Management</h3>
-                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">Upload and organize your learning materials.</p>
+                <h3 style="font-size: 1rem; font-weight: 800; color: var(--brand); margin-bottom: 1rem;">Pending Join Requests</h3>
+                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">Review and approve students requesting to join.</p>
             </div>
-            <button class="btn btn-outline" style="width: 100%; padding: 1rem; border-radius: 0.75rem; font-weight: 700; display: flex; justify-content: center; align-items: center;">Upload New File</button>
+            <div style="background: #E0E7FF; color: #3730A3; padding: 1rem; border-radius: 0.75rem; text-align: center; font-weight: 700;">
+                {{ $pendingJoinCount ?? 0 }} Join Requests
+            </div>
         </div>
 
     </div>
@@ -46,7 +48,7 @@
     <div style="background: white; border-radius: 1.5rem; border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow); margin-bottom: 3rem;">
         <div style="padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--surface);">
             <h2 style="font-size: 1.25rem; font-weight: 800; color: var(--brand); margin: 0;">My Active Classrooms</h2>
-            <a href="{{ route('rooms.create') }}" class="btn btn-accent" style="font-size: 0.85rem; padding: 0.5rem 1rem;">+ Create New Room</a>
+            <a href="{{ route('rooms.index') }}" class="btn btn-outline" style="font-size: 0.85rem; padding: 0.5rem 1rem;">View All Classrooms</a>
         </div>
         <table style="width: 100%; border-collapse: collapse; text-align: left;">
             <thead>
@@ -85,7 +87,7 @@
                 @empty
                 <tr>
                     <td colspan="4" style="padding: 5rem 2rem; text-align: center;">
-                        <img src="{{ asset('images/room-invisible.png') }}" alt="No Classrooms" style="width: 200px; margin-bottom: 1.5rem; opacity: 0.7;">
+
                         <p style="color: var(--text-muted); font-size: 1.1rem; font-weight: 600;">You haven't created any classrooms yet.</p>
                         <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.5rem;">Start by clicking the "Create New Room" button.</p>
                     </td>
@@ -115,6 +117,29 @@
                                 <a href="{{ route('rooms.enter', ['room' => $pending->file->room->id, 'org_slug' => $pending->org_slug]) }}" class="btn btn-accent" style="font-size: 0.8rem; padding: 0.5rem 0.85rem;">Go to Classroom</a>
                             @else
                                 <a href="{{ route('rooms.show', $pending->file->room->id) }}" class="btn btn-accent" style="font-size: 0.8rem; padding: 0.5rem 0.85rem;">Go to Classroom</a>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
+    @if(isset($pendingJoinRequests) && $pendingJoinRequests->count() > 0)
+        <div style="background: #fff; border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.5rem; margin-top: 2rem;">
+            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand); margin-bottom: 1rem;">Pending Join Requests</h2>
+            <div style="display: grid; gap: 1rem;">
+                @foreach($pendingJoinRequests as $join)
+                    <div style="border: 1px solid var(--border); border-radius: 0.75rem; padding: 1rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+                        <div>
+                            <p style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--brand);">{{ $join->student_name }} ({{ $join->student_email }})</p>
+                            <p style="margin: 0.25rem 0 0; color: var(--text-muted); font-size: 0.9rem;">Requested to join <strong>{{ $join->room_name }}</strong> in <strong>{{ $join->org_name ?? 'Central System' }}</strong>.</p>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                            @if(isset($join->org_slug))
+                                <a href="{{ route('rooms.enter', ['room' => $join->room_id, 'org_slug' => $join->org_slug]) }}" class="btn btn-accent" style="font-size: 0.8rem; padding: 0.5rem 0.85rem;">Review in Classroom</a>
+                            @else
+                                <a href="{{ route('rooms.show', $join->room_id) }}" class="btn btn-accent" style="font-size: 0.8rem; padding: 0.5rem 0.85rem;">Review in Classroom</a>
                             @endif
                         </div>
                     </div>

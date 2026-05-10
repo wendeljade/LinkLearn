@@ -27,7 +27,13 @@
                     @forelse($teachers as $teacher)
                     <tr style="border-bottom: 1px solid var(--brand-soft);">
                         <td style="padding: 1.25rem 2rem; font-weight: 700; color: var(--brand);">{{ $teacher->name }}</td>
-                        <td style="padding: 1.25rem 2rem; color: var(--text-main);">{{ $teacher->organization->name ?? 'No Organization' }}</td>
+                        <td style="padding: 1.25rem 2rem; color: var(--text-main);">
+                            @if(isset($teacher->all_organizations) && $teacher->all_organizations->isNotEmpty())
+                                {{ $teacher->all_organizations->pluck('name')->implode(', ') }}
+                            @else
+                                <span style="color: var(--text-muted); font-style: italic;">No Organization</span>
+                            @endif
+                        </td>
                         <td style="padding: 1.25rem 2rem; color: var(--text-muted);">{{ $teacher->created_at->format('M d, Y') }}</td>
                     </tr>
                     @empty
@@ -56,7 +62,13 @@
                     @forelse($students as $student)
                     <tr style="border-bottom: 1px solid var(--brand-soft);">
                         <td style="padding: 1.25rem 2rem; font-weight: 700; color: var(--brand);">{{ $student->name }}</td>
-                        <td style="padding: 1.25rem 2rem; color: var(--text-main);">{{ $student->organization->name ?? 'No Organization' }}</td>
+                        <td style="padding: 1.25rem 2rem; color: var(--text-main);">
+                            @if(isset($student->all_organizations) && $student->all_organizations->isNotEmpty())
+                                {{ $student->all_organizations->pluck('name')->implode(', ') }}
+                            @else
+                                <span style="color: var(--text-muted); font-style: italic;">No Organization</span>
+                            @endif
+                        </td>
                         <td style="padding: 1.25rem 2rem; color: var(--text-muted);">{{ $student->created_at->format('M d, Y') }}</td>
                     </tr>
                     @empty

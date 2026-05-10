@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'LinkLearn')</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -168,6 +169,9 @@
                 <a href="{{ $dashboardLink }}" class="nav-link {{ request()->is('dashboard*') ? 'active' : '' }}">Dashboard</a>
                 <a href="{{ $classroomsLink }}" class="nav-link {{ request()->is('rooms*') || request()->is('org/*/rooms*') ? 'active' : '' }}">Classrooms</a>
                 <a href="{{ $isTenantContext ? '/team' : ($orgSlug ? route('org.team', ['tenant' => $orgSlug]) : '#') }}" class="nav-link {{ request()->is('team*') ? 'active' : '' }}">Teams</a>
+                @if($isTenantContext)
+                    <a href="#" onclick="document.getElementById('gcash-qr-modal').style.display='flex'; return false;" class="nav-link">GCash QR Code</a>
+                @endif
                 @if($currentOrg && $currentOrg->status !== 'active')
                     <a href="{{ $isTenantContext ? $centralBase . '/org/' . $currentOrg->slug . '/subscription/payment' : route('org.subscription.payment', $currentOrg->slug) }}" class="nav-link {{ request()->is('org/*/subscription/payment*') ? 'active' : '' }}">Pay Subscription</a>
                 @endif
@@ -176,7 +180,8 @@
             @else
                 {{-- Student and other roles --}}
                 <a href="{{ $dashboardLink }}" class="nav-link {{ request()->is('dashboard*') ? 'active' : '' }}">Dashboard</a>
-                <a href="{{ $classroomsLink }}" class="nav-link {{ request()->is('rooms*') || request()->is('org/*/rooms*') ? 'active' : '' }}">Classrooms</a>
+                <a href="{{ $classroomsLink }}" class="nav-link {{ request()->is('rooms') && !request()->is('rooms/explore') ? 'active' : '' }}">My Classrooms</a>
+                <a href="{{ $isTenantContext ? $centralBase . '/rooms/explore' : route('rooms.explore') }}" class="nav-link {{ request()->is('rooms/explore') ? 'active' : '' }}">Explore Classrooms</a>
                 @if($currentOrg && $currentOrg->status !== 'active')
                     <a href="{{ $isTenantContext ? $centralBase . '/org/' . $currentOrg->slug . '/subscription/payment' : route('org.subscription.payment', $currentOrg->slug) }}" class="nav-link {{ request()->is('org/*/subscription/payment*') ? 'active' : '' }}">Pay Subscription</a>
                 @endif
@@ -190,7 +195,24 @@
     <div class="wrapper {{ auth()->check() ? 'with-sidebar' : '' }}">
         <header class="{{ auth()->check() ? 'header-auth' : 'header-public' }}">
             @if(auth()->check())
-                <div class="user-dropdown">
+                <div style="display: flex; align-items: center; gap: 1.5rem;">
+                    {{-- Notifications Bell --}}
+                    @php
+                        $unreadNotificationsCount = auth()->user()->notifications()->whereNull('read_at')->count();
+                    @endphp
+                    <a href="{{ (function_exists('tenant') && tenant()) ? route('org.notifications.index') : route('notifications.index') }}" style="position: relative; color: var(--brand); text-decoration: none; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: var(--surface); transition: 0.2s;" onmouseover="this.style.background='#e2e8f0';" onmouseout="this.style.background='var(--surface)';">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                        @if($unreadNotificationsCount > 0)
+                            <span style="position: absolute; top: 0; right: 0; background: var(--danger, #dc2626); color: white; font-size: 0.65rem; font-weight: 800; min-width: 18px; height: 18px; border-radius: 99px; display: flex; align-items: center; justify-content: center; border: 2px solid white; transform: translate(25%, -25%);">
+                                {{ $unreadNotificationsCount > 99 ? '99+' : $unreadNotificationsCount }}
+                            </span>
+                        @endif
+                    </a>
+
+                    <div class="user-dropdown">
                     <button class="dropdown-trigger" id="profileBtn">
                         <span style="font-weight: 700; font-size: 0.8rem; text-transform: uppercase;">{{ auth()->user()->name }}</span>
                         <img src="{{ auth()->user()->avatar ?? 'https://ui-avatars.com/api/?name=' . urlencode(auth()->user()->name) . '&background=f59e0b&color=0f172a' }}" alt="Avatar" class="avatar">
@@ -202,26 +224,13 @@
                             </strong>
                         </div>
 
-                        @php
-                            $currentVersion = \Illuminate\Support\Facades\Cache::get('system_current_version', 'v1.0.0');
-                        @endphp
-
-                        @if(isset($appVersion) && isset($currentVersion) && $appVersion !== $currentVersion)
-                            @php
-                                $updateRoute = function_exists('tenant') && tenant() ? route('org.system.update', ['version' => $appVersion, 'tenant' => tenant('slug')]) : route('system.update', ['version' => $appVersion]);
-                            @endphp
-                            <a href="{{ $updateRoute }}" class="dropdown-item" style="color: var(--accent); display: flex; justify-content: space-between; align-items: center; text-decoration: none;">
-                                <span>Update System</span>
-                                <span style="background: var(--brand-soft); color: var(--brand); padding: 0.2rem 0.5rem; border-radius: 0.3rem; font-size: 0.7rem; font-weight: 800;">{{ $appVersion }}</span>
-                            </a>
-                            <div style="height: 1px; background: var(--border); margin: 0.25rem 0;"></div>
-                        @endif
 
                         <form action="{{ (function_exists('tenant') && tenant()) ? route('org.logout') : route('logout') }}" method="POST">
                             @csrf
                             <button type="submit" class="dropdown-item" style="color: var(--danger);">Logout</button>
                         </form>
                     </div>
+                </div>
                 </div>
             @else
                 {{-- Truly Centered Navbar Elements for Public --}}
@@ -324,5 +333,53 @@
             });
         }
     </script>
+
+@auth
+@if((function_exists('tenant') && tenant()) && auth()->user()->role === 'org_admin')
+@php $gcashOrg = tenant(); @endphp
+{{-- GCash QR Code Management Modal --}}
+<div id="gcash-qr-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 1rem;">
+    <div style="background: #fff; width: 100%; max-width: 420px; border-radius: 1rem; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,.25);">
+        <div style="padding: 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #00b4d8, #0077b6);">
+            <div>
+                <h3 style="font-weight: 800; color: #fff; margin: 0; font-size: 1.1rem;">💳 GCash QR Code</h3>
+                <p style="color: rgba(255,255,255,0.8); font-size: 0.8rem; margin: 0.25rem 0 0;">Manage your organization's payment QR</p>
+            </div>
+            <button onclick="document.getElementById('gcash-qr-modal').style.display='none'" style="background: rgba(255,255,255,0.2); border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #fff; font-size: 1.2rem; display: flex; align-items: center; justify-content: center;">&times;</button>
+        </div>
+        <div style="padding: 1.5rem;">
+            @if($gcashOrg->gcash_qr_code)
+                <div style="margin-bottom: 1.25rem; text-align: center;">
+                    <p style="font-size: 0.8rem; color: #64748b; font-weight: 600; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">Current QR Code</p>
+                    @php
+                        $centralDomains = config('tenancy.central_domains', ['localhost']);
+                        $centralDomain  = $centralDomains[0];
+                        $port = request()->getPort();
+                        $portStr = ($port && $port != 80 && $port != 443) ? ':' . $port : '';
+                        $qrUrl = request()->getScheme() . '://' . $centralDomain . $portStr . '/org-qr/' . $gcashOrg->slug;
+                    @endphp
+                    <img src="{{ $qrUrl }}" alt="GCash QR Code" style="max-width: 200px; border-radius: 0.75rem; border: 3px solid #00b4d8; padding: 0.5rem;">
+                </div>
+            @else
+                <div style="border: 2px dashed #e2e8f0; border-radius: 0.75rem; padding: 2rem; text-align: center; margin-bottom: 1.25rem;">
+                    <div style="font-size: 3rem; margin-bottom: 0.5rem;">📷</div>
+                    <p style="color: #94a3b8; font-size: 0.85rem; font-weight: 600;">No GCash QR Code uploaded yet</p>
+                </div>
+            @endif
+
+            <form action="{{ route('org.gcash.upload') }}" method="POST" enctype="multipart/form-data">
+                @csrf
+                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-bottom: 0.5rem;">
+                    {{ $gcashOrg->gcash_qr_code ? '🔄 Replace QR Code' : '⬆️ Upload QR Code' }}
+                </label>
+                <input type="file" name="gcash_qr_code" accept="image/*" required style="width: 100%; padding: 0.6rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; margin-bottom: 1rem; font-size: 0.85rem;">
+                <button type="submit" style="width: 100%; padding: 0.75rem; background: linear-gradient(135deg, #00b4d8, #0077b6); color: #fff; border: none; border-radius: 0.75rem; font-weight: 700; font-size: 0.9rem; cursor: pointer;">Save QR Code</button>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
+@endauth
+
 </body>
 </html>

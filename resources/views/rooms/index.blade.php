@@ -9,6 +9,8 @@
             <h1 style="font-size: 2.25rem; font-weight: 800; color: var(--brand); letter-spacing: -0.04em; margin-bottom: 0.5rem;">
                 @if(isset($org))
                     {{ $org->name . ' Classrooms' }}
+                @elseif(isset($isExplore) && $isExplore)
+                    Explore Classrooms
                 @elseif(auth()->check() && (auth()->user()->isTeacher() || auth()->user()->isStudent()))
                     My Classrooms
                 @else
@@ -17,7 +19,7 @@
             </h1>
             <p style="color: var(--text-muted); font-weight: 600;">Explore our available rooms and start learning.</p>
         </div>
-        @if(auth()->check() && (auth()->user()->isTeacher() || auth()->user()->isAdmin()))
+        @if(auth()->check() && auth()->user()->isAdmin())
             <a href="{{ isset($org) ? route('org.rooms.create') : route('rooms.create') }}" class="btn btn-accent">+ Create New Room</a>
         @endif
     </div>
@@ -93,10 +95,10 @@
                             if ($roomOrgSlug) {
                                 $showRoute = route('rooms.enter', ['room' => $room->id, 'org_slug' => $roomOrgSlug]);
                                 // We use the central join route to join, which requires no tenant context
-                                $joinRoute = route('rooms.join', $room->id);
+                                $joinRoute = route('rooms.join', ['room_id' => $room->id, 'org_slug' => $roomOrgSlug]);
                             } else {
                                 $showRoute = route('rooms.show', $room->id);
-                                $joinRoute = route('rooms.show', $room->id); // central students self-join via show page
+                                $joinRoute = route('rooms.join', ['room_id' => $room->id]);
                             }
                         @endphp
                         
@@ -104,11 +106,15 @@
                             <a href="{{ $showRoute }}" style="color: var(--brand); background: var(--accent); font-weight: 700; font-size: 0.8rem; padding: 0.5rem 1.5rem; text-decoration: none; border-radius: 0.5rem; transition: 0.2s; text-transform: uppercase; letter-spacing: 0.05em; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);" onmouseover="this.style.opacity='0.9'; this.style.transform='translateY(-1px)';" onmouseout="this.style.opacity='1'; this.style.transform='translateY(0)';" >
                                 Enter
                             </a>
+                        @elseif(isset($room->join_status) && $room->join_status === 'pending')
+                            <button disabled style="color: #64748b; background: #e2e8f0; font-weight: 700; font-size: 0.8rem; padding: 0.5rem 1.5rem; border: none; border-radius: 0.5rem; cursor: not-allowed; text-transform: uppercase; letter-spacing: 0.05em;">
+                                Pending Approval
+                            </button>
                         @elseif($joinRoute)
                             <form action="{{ $joinRoute }}" method="POST" style="margin: 0;">
                                 @csrf
                                 <button type="submit" style="color: #fff; background: var(--brand); font-weight: 700; font-size: 0.8rem; padding: 0.5rem 1.5rem; border: none; border-radius: 0.5rem; cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 0.05em; box-shadow: 0 2px 4px rgba(15, 23, 42, 0.2);" onmouseover="this.style.opacity='0.9'; this.style.transform='translateY(-1px)';" onmouseout="this.style.opacity='1'; this.style.transform='translateY(0)';" >
-                                    Join
+                                    Request to Join
                                 </button>
                             </form>
                         @endif

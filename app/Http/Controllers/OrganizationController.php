@@ -133,6 +133,19 @@ class OrganizationController extends Controller
             'proof_of_payment' => $proofPath,
         ]);
 
+        // Notify super admins
+        $superAdmins = \App\Models\User::where('role', 'super_admin')->get();
+        foreach ($superAdmins as $superAdmin) {
+            \App\Models\Notification::create([
+                'user_id' => $superAdmin->id,
+                'type' => 'org_payment_submitted',
+                'title' => 'New Payment Received',
+                'message' => 'Organization "' . $org->name . '" has submitted a payment and is awaiting approval.',
+                'link' => route('admin.dashboard'),
+                'icon' => '💳'
+            ]);
+        }
+
         return redirect()->route('org.subscription.payment', $org->slug)
             ->with('success', 'Payment received. Your organization is now waiting for super admin approval.');
     }
@@ -158,9 +171,10 @@ class OrganizationController extends Controller
         }
 
         $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'cover_photo' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
+            'name'           => 'required|string|max:255',
+            'description'    => 'nullable|string',
+            'cover_photo'    => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
+            'gcash_qr_code'  => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
         ]);
 
         $data = [
@@ -172,9 +186,62 @@ class OrganizationController extends Controller
             $data['cover_photo'] = $request->file('cover_photo')->store('covers', 'public');
         }
 
+        if ($request->hasFile('gcash_qr_code')) {
+            $data['gcash_qr_code'] = $request->file('gcash_qr_code')->store('gcash_qr', 'central_public');
+        }
+
         $org->update($data);
 
         return redirect()->route('org.admin.dashboard')->with('success', 'Settings updated successfully!');
+    }
+
+    public function uploadGcashQr(\Illuminate\Http\Request $request)
+    {
+        $org = tenant();
+
+        if ($org->user_id !== auth()->id() && !auth()->user()->isAdmin()) {
+            abort(403);
+        }
+
+        $request->validate([
+            'gcash_qr_code' => 'required|image|mimes:jpeg,png,jpg|max:5120',
+        ]);
+
+        $path = $request->file('gcash_qr_code')->store('gcash_qr', 'central_public');
+        $org->update(['gcash_qr_code' => $path]);
+
+        return back()->with('success', 'GCash QR Code updated successfully!');
+    }
+
+    /**
+     * Serve the GCash QR code image for an organization.
+     * Uses absolute paths to locate the file regardless of which tenant's storage it's in.
+     * This is a PUBLIC route — no auth required (it's just an image).
+     */
+    public function serveGcashQr($slug)
+    {
+        $org = \App\Models\Organization::where('slug', $slug)->firstOrFail();
+
+        if (!$org->gcash_qr_code) {
+            abort(404, 'No GCash QR code set for this organization.');
+        }
+
+        $basePath = base_path('storage');
+        $filePath = $org->gcash_qr_code;
+
+        // Try central storage first
+        $centralPath = $basePath . '/app/public/' . $filePath;
+        if (file_exists($centralPath)) {
+            return response()->file($centralPath);
+        }
+
+        // Try tenant-specific storage (tenancy stores files in storage/tenant{slug}/app/public/)
+        $tenantPath = $basePath . '/tenant' . $slug . '/app/public/' . $filePath;
+        if (file_exists($tenantPath)) {
+            return response()->file($tenantPath);
+        }
+
+        abort(404, 'GCash QR code file not found.');
     }
 
     public function dashboard()
@@ -305,7 +372,7 @@ class OrganizationController extends Controller
             return back()->with('error', 'This user is already assigned to another organization.');
         }
 
-        User::updateOrCreate(
+        $user = User::updateOrCreate(
             ['email' => $request->email],
             [
                 'name' => $request->name,
@@ -314,6 +381,15 @@ class OrganizationController extends Controller
                 'password' => bcrypt('ChangeMe123!'),
             ]
         );
+
+        \App\Models\Notification::create([
+            'user_id' => $user->id,
+            'type' => 'org_invited',
+            'title' => 'Added to Organization',
+            'message' => 'You have been added to the organization "' . $org->name . '" as a ' . $request->role . '.',
+            'link' => route('dashboard'),
+            'icon' => '🤝'
+        ]);
 
         return back()->with('success', 'Team member invited successfully.');
     }

@@ -72,7 +72,29 @@ class Room extends Model
     {
         $tenantDb = config('database.connections.tenant.database');
         $table = $tenantDb ? "{$tenantDb}.room_user" : 'room_user';
-        return $this->belongsToMany(User::class, $table);
+        return $this->belongsToMany(User::class, $table)
+                    ->withPivot('status')
+                    ->wherePivot('status', 'approved');
+    }
+
+    public function pendingStudents()
+    {
+        $tenantDb = config('database.connections.tenant.database');
+        $table = $tenantDb ? "{$tenantDb}.room_user" : 'room_user';
+        return $this->belongsToMany(User::class, $table)
+                    ->withPivot('status')
+                    ->wherePivot('status', 'pending');
+    }
+
+    /**
+     * All students regardless of status — used for pivot updates (approve/reject).
+     */
+    public function allStudents()
+    {
+        $tenantDb = config('database.connections.tenant.database');
+        $table = $tenantDb ? "{$tenantDb}.room_user" : 'room_user';
+        return $this->belongsToMany(User::class, $table)
+                    ->withPivot('status');
     }
 
     public function files()
@@ -83,5 +105,10 @@ class Room extends Model
     public function activities()
     {
         return $this->hasMany(Activity::class);
+    }
+
+    public function announcements()
+    {
+        return $this->hasMany(Announcement::class);
     }
 }

@@ -30,8 +30,8 @@ class DashboardController extends Controller
                     if (tenancy()->initialized) tenancy()->end();
                 }
             }
-            $paidTenants = Organization::where('status', 'active')->count();
-            $totalIncome = $paidTenants * 999; // Monthly tenant subscription revenue
+            $totalPaymentsMade = Organization::sum('total_payments_made');
+            $totalIncome = $totalPaymentsMade * 999; // Cumulative tenant subscription revenue
             
             $recentOrganizations = Organization::with('owner')->latest()->take(5)->get();
             $pendingOrganizations = Organization::where('status', 'pending_approval')->with('owner')->get();
@@ -89,9 +89,11 @@ class DashboardController extends Controller
         if ($user->isTeacher()) {
             $rooms = $user->allTaughtRooms();
             $pendingRequests = $user->allPendingRequests();
+            $pendingJoinRequests = $user->allPendingJoinRequests();
 
             $pendingCount = $pendingRequests->count();
-            return view('teacher.dashboard', compact('rooms', 'pendingRequests', 'pendingCount'));
+            $pendingJoinCount = $pendingJoinRequests->count();
+            return view('teacher.dashboard', compact('rooms', 'pendingRequests', 'pendingCount', 'pendingJoinRequests', 'pendingJoinCount'));
         }
 
         if ($user->isStudent()) {

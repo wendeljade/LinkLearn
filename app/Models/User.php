@@ -47,6 +47,11 @@ public function organization()
     return $this->belongsTo(Organization::class, 'organization_id', 'id');
 }
 
+public function notifications()
+{
+    return $this->hasMany(Notification::class);
+}
+
 public function rooms()
 {
     return $this->hasMany(Room::class, 'tutor_id');
@@ -56,7 +61,9 @@ public function joinedRooms()
 {
     $tenantDb = config('database.connections.tenant.database');
     $table = $tenantDb ? "{$tenantDb}.room_user" : 'room_user';
-    return $this->belongsToMany(Room::class, $table);
+    return $this->belongsToMany(Room::class, $table)
+                ->withPivot('status')
+                ->wherePivot('status', 'approved');
 }
 
 /**
@@ -87,7 +94,8 @@ public function allJoinedRooms($status = 'open'): \Illuminate\Support\Collection
         try {
             $rows = \Illuminate\Support\Facades\DB::select(
                 "SELECT r.*,
-                        ? AS org_slug, ? AS org_name, ? AS org_id
+                        ? AS org_slug, ? AS org_name, ? AS org_id,
+                        ru.status AS join_status
                  FROM `{$tenantDb}`.`rooms` r
                  INNER JOIN `{$tenantDb}`.`room_user` ru ON ru.room_id = r.id
                  WHERE ru.user_id = ? AND r.status = ?",
@@ -95,6 +103,11 @@ public function allJoinedRooms($status = 'open'): \Illuminate\Support\Collection
             );
 
             foreach ($rows as $row) {
+                // Skip pending memberships for 'My Classrooms'
+                if ($row->join_status !== 'approved') {
+                    continue;
+                }
+
                 // Hydrate Eloquent model so views can use methods like coverPhotoUrl()
                 $attributes = (array) $row;
                 $roomModel = (new Room())->newFromBuilder($attributes);
@@ -108,8 +121,11 @@ public function allJoinedRooms($status = 'open'): \Illuminate\Support\Collection
                 // Flag that the current user is a member (avoids cross-db relation queries)
                 $roomModel->is_member = true;
                 
-                // Eager load the tutor from the central database
-                $roomModel->load('tutor');
+                // Eager load the tutor from the central database explicitly
+                if ($roomModel->tutor_id) {
+                    $tutor = \App\Models\User::on('central')->find($roomModel->tutor_id);
+                    $roomModel->setRelation('tutor', $tutor);
+                }
 
                 $allRooms->push($roomModel);
             }
@@ -174,6 +190,12 @@ public function allTaughtRooms($status = 'open'): \Illuminate\Support\Collection
                 $roomModel->is_tutor     = true;
                 $roomModel->is_member    = true; // tutors are always members of their rooms
 
+                // Load tutor from central DB explicitly
+                if ($roomModel->tutor_id) {
+                    $tutor = \App\Models\User::on('central')->find($roomModel->tutor_id);
+                    $roomModel->setRelation('tutor', $tutor);
+                }
+
                 $allRooms->push($roomModel);
             }
         } catch (\Exception $e) {
@@ -184,6 +206,135 @@ public function allTaughtRooms($status = 'open'): \Illuminate\Support\Collection
     }
 
     return $allRooms;
+}
+
+/**
+ * Get ALL open classrooms across ALL organizations, attaching the current user's join_status if any.
+ */
+public function allExploreRooms(): \Illuminate\Support\Collection
+{
+    $allRooms = collect();
+    $prefix   = config('tenancy.database.prefix', 'linklearn_org_');
+
+    // 1. Get rooms from the central database
+    $centralRooms = Room::on('central')
+        ->where('status', 'open')
+        ->with('tutor')
+        ->get();
+        
+    foreach ($centralRooms as $room) {
+        $pivot = $room->students()->wherePivot('user_id', $this->id)->first();
+        $room->join_status = $pivot ? $pivot->pivot->status : null;
+        $room->is_member = ($room->join_status === 'approved' || $room->tutor_id === $this->id);
+        
+        // Only show rooms the user has NOT joined yet
+        if (!$room->is_member) {
+            $allRooms->push($room);
+        }
+    }
+
+    // 2. Loop through ALL active organizations and query their tenant databases
+    $orgs = \App\Models\Organization::where('status', 'active')->get();
+
+    foreach ($orgs as $org) {
+        $tenantDb = $prefix . $org->slug;
+
+        $exists = \Illuminate\Support\Facades\DB::select(
+            "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?",
+            [$tenantDb]
+        );
+        if (empty($exists)) continue;
+
+        try {
+            // Find all open rooms. LEFT JOIN room_user to get the current user's status.
+            $rows = \Illuminate\Support\Facades\DB::select(
+                "SELECT r.*, 
+                        ? AS org_slug, ? AS org_name, ? AS org_id,
+                        ru.status AS join_status
+                 FROM `{$tenantDb}`.`rooms` r
+                 LEFT JOIN `{$tenantDb}`.`room_user` ru ON ru.room_id = r.id AND ru.user_id = ?
+                 WHERE r.status = 'open'",
+                [$org->slug, $org->name, $org->id, $this->id]
+            );
+
+            foreach ($rows as $row) {
+                $attributes = (array) $row;
+                $roomModel = (new Room())->newFromBuilder($attributes);
+
+                $roomModel->org_slug     = $org->slug;
+                $roomModel->org_name     = $org->name;
+                $roomModel->org_id       = $org->id;
+                $roomModel->organization = $org;
+                $roomModel->join_status  = $row->join_status;
+                $roomModel->is_member    = ($roomModel->join_status === 'approved' || $roomModel->tutor_id === $this->id);
+
+                // Only show rooms the user has NOT joined yet
+                if ($roomModel->is_member) {
+                    continue;
+                }
+
+                // Load tutor from central DB explicitly
+                if ($roomModel->tutor_id) {
+                    $tutor = \App\Models\User::on('central')->find($roomModel->tutor_id);
+                    $roomModel->setRelation('tutor', $tutor);
+                }
+
+                // Don't add if already fetched via central (avoids duplication if sync exists)
+                if (!$allRooms->contains('id', $roomModel->id)) {
+                    $allRooms->push($roomModel);
+                }
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('allExploreRooms: skipping tenant ' . $org->slug, [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    return $allRooms;
+}
+
+public function allPendingJoinRequests()
+{
+    $allRequests = collect();
+    $centralDb = \Illuminate\Support\Facades\DB::connection('central')->getDatabaseName();
+
+    // Loop through ALL active organizations and query their tenant databases
+    $orgs = \App\Models\Organization::where('status', 'active')->get();
+    $prefix = config('tenancy.database.prefix', 'linklearn_org_');
+
+    foreach ($orgs as $org) {
+        $tenantDb = $prefix . $org->slug;
+        $exists = \Illuminate\Support\Facades\DB::connection('central')->select(
+            "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?",
+            [$tenantDb]
+        );
+        if (empty($exists)) continue;
+
+        try {
+            $rows = \Illuminate\Support\Facades\DB::connection('central')->select(
+                "SELECT ru.room_id, ru.user_id, ru.status,
+                        r.subject_name AS room_name,
+                        u.name AS student_name, u.email AS student_email, u.avatar AS student_profile,
+                        ? AS org_slug, ? AS org_name, ? AS org_id
+                 FROM `{$tenantDb}`.`room_user` ru
+                 INNER JOIN `{$tenantDb}`.`rooms` r ON r.id = ru.room_id
+                 LEFT JOIN `{$centralDb}`.`users` u ON u.id = ru.user_id
+                 WHERE r.tutor_id = ? AND ru.status = 'pending'",
+                [$org->slug, $org->name, $org->id, $this->id]
+            );
+
+            foreach ($rows as $row) {
+                $allRequests->push((object) $row);
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('allPendingJoinRequests: skipping tenant ' . $org->slug, [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    return $allRequests;
 }
 
 public function allPendingRequests()

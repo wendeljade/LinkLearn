@@ -97,6 +97,68 @@
                 <p style="color: var(--text-muted); line-height: 1.6;">{{ $room->description ?? 'No description available.' }}</p>
             </div>
 
+            @if(($isAdmin || $isTutor) && isset($pendingStudents) && $pendingStudents->count() > 0)
+                <div style="background: #fff; border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 2rem; border-left: 4px solid #f59e0b;">
+                    <h2 style="font-size: 1.25rem; font-weight: 700; color: #d97706; margin-bottom: 1rem;">Pending Join Requests</h2>
+                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        @foreach($pendingStudents as $student)
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #fef3c7; border-radius: 0.5rem;">
+                                <div style="display: flex; align-items: center; gap: 1rem;">
+                                    <img src="{{ $student->avatar ?? 'https://ui-avatars.com/api/?name='.urlencode($student->name) }}" alt="{{ $student->name }}" style="width: 40px; height: 40px; border-radius: 50%;">
+                                    <div>
+                                        <p style="font-weight: 700; color: var(--brand); margin: 0;">{{ $student->name }}</p>
+                                        <p style="font-size: 0.8rem; color: #92400e; margin: 0;">{{ $student->email }}</p>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <form action="{{ isset($org) ? route('org.rooms.approve-student', [$room->id, $student->id]) : route('rooms.approve-student', [$room->id, $student->id]) }}" method="POST" style="margin: 0;">
+                                        @csrf
+                                        <button type="submit" class="btn btn-accent" style="padding: 0.4rem 1rem; font-size: 0.85rem;">Approve</button>
+                                    </form>
+                                    <form action="{{ isset($org) ? route('org.rooms.reject-student', [$room->id, $student->id]) : route('rooms.reject-student', [$room->id, $student->id]) }}" method="POST" style="margin: 0;">
+                                        @csrf
+                                        <button type="submit" class="btn btn-outline" style="padding: 0.4rem 1rem; font-size: 0.85rem; color: #dc2626; border-color: #fca5a5;">Reject</button>
+                                    </form>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
+            {{-- Announcements Section --}}
+            <div style="background: #fff; border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 2rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand);">Announcements</h2>
+                    @if($isTutor)
+                        <button onclick="document.getElementById('announcement-modal').style.display='flex'" class="btn btn-accent" style="font-size: 0.875rem; padding: 0.5rem 1rem;">+ Post Announcement</button>
+                    @endif
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    @forelse($room->announcements()->latest()->get() as $announcement)
+                        <div style="border-left: 4px solid var(--accent); background: #f8fafc; padding: 1rem; border-radius: 0 0.5rem 0.5rem 0;">
+                            <p style="font-size: 0.95rem; color: var(--text); margin-bottom: 0.5rem; white-space: pre-wrap;">{{ $announcement->content }}</p>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <small style="color: var(--text-muted); font-size: 0.75rem;">Posted on {{ $announcement->created_at->format('M d, Y h:i A') }}</small>
+                                @if($isTutor)
+                                    <div style="display: flex; gap: 0.5rem;">
+                                        <button onclick="openEditAnnouncementModal('{{ $announcement->id }}', '{{ addslashes($announcement->content) }}', '{{ isset($org) ? route('org.rooms.announcements.update', [$room->id, $announcement->id]) : route('rooms.announcements.update', [$room->id, $announcement->id]) }}')" class="btn btn-outline" style="font-size: 0.7rem; padding: 0.2rem 0.5rem;">Edit</button>
+                                        <form action="{{ isset($org) ? route('org.rooms.announcements.destroy', [$room->id, $announcement->id]) : route('rooms.announcements.destroy', [$room->id, $announcement->id]) }}" method="POST" onsubmit="return confirm('Delete this announcement?');" style="margin: 0;">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-outline" style="font-size: 0.7rem; padding: 0.2rem 0.5rem; color: #dc2626; border-color: #fca5a5;">Delete</button>
+                                        </form>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    @empty
+                        <p style="text-align: center; color: var(--text-muted); font-size: 0.9rem; margin: 0;">No announcements posted.</p>
+                    @endforelse
+                </div>
+            </div>
+
             {{-- Activities Section --}}
             <div style="background: #fff; border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 2rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
@@ -112,13 +174,16 @@
                             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
                                 <div>
                                     <h3 style="font-size: 1.1rem; font-weight: 800; color: var(--brand); margin-bottom: 0.25rem;">{{ $activity->title }}</h3>
-                                    <p style="font-size: 0.85rem; color: var(--text-muted);">Deadline: {{ $activity->deadline ? \Carbon\Carbon::parse($activity->deadline)->format('M d, Y h:i A') : 'No deadline' }}</p>
+                                    <p style="font-size: 0.85rem; color: var(--text-muted);">Deadline: {{ $activity->deadline ? \Carbon\Carbon::parse($activity->deadline)->format('M d, Y h:i A') : 'No deadline' }} {!! $activity->allow_late_submissions ? '<span style="color: #059669; font-weight: 600; margin-left: 0.5rem;">(Late Allowed)</span>' : '<span style="color: #dc2626; font-weight: 600; margin-left: 0.5rem;">(No Late Submissions)</span>' !!}</p>
                                     @if($isTutor)
-                                        <form action="{{ isset($org) ? route('org.rooms.activities.destroy', $activity->id) : route('rooms.activities.destroy', $activity->id) }}" method="POST" style="display: inline-block; margin-top: 0.5rem;" onsubmit="return confirm('Are you sure you want to delete this activity? This will also delete all student submissions.');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-outline" style="font-size: 0.75rem; padding: 0.25rem 0.75rem; color: #dc2626; border-color: #fca5a5;">Delete Activity</button>
-                                        </form>
+                                        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                                            <button onclick="openEditActivityModal('{{ $activity->id }}', '{{ addslashes($activity->title) }}', '{{ addslashes($activity->description) }}', '{{ $activity->deadline ? \Carbon\Carbon::parse($activity->deadline)->format('Y-m-d\TH:i') : '' }}', '{{ $activity->allow_late_submissions }}', '{{ $activity->link }}', '{{ isset($org) ? route('org.rooms.activities.update', $activity->id) : route('rooms.activities.update', $activity->id) }}')" class="btn btn-outline" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">Edit Activity</button>
+                                            <form action="{{ isset($org) ? route('org.rooms.activities.destroy', $activity->id) : route('rooms.activities.destroy', $activity->id) }}" method="POST" style="display: inline-block;" onsubmit="return confirm('Are you sure you want to delete this activity? This will also delete all student submissions.');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-outline" style="font-size: 0.75rem; padding: 0.25rem 0.75rem; color: #dc2626; border-color: #fca5a5;">Delete</button>
+                                            </form>
+                                        </div>
                                     @endif
                                 </div>
                                 @if($isStudent)
@@ -131,7 +196,13 @@
                                             @endif
                                         </div>
                                     @else
-                                        <button onclick="openSubmitModal('{{ $activity->id }}', '{{ $activity->title }}')" class="btn btn-brand" style="font-size: 0.8rem; padding: 0.4rem 1rem;">Submit Answer</button>
+                                        @if(!$activity->allow_late_submissions && $activity->deadline && \Carbon\Carbon::now()->gt(\Carbon\Carbon::parse($activity->deadline)))
+                                            <div style="text-align: right;">
+                                                <span style="background: #fee2e2; color: #991b1b; padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 700; display: inline-block;">DEADLINE PASSED</span>
+                                            </div>
+                                        @else
+                                            <button onclick="openSubmitModal('{{ $activity->id }}', '{{ addslashes($activity->title) }}')" class="btn btn-brand" style="font-size: 0.8rem; padding: 0.4rem 1rem;">Submit Answer</button>
+                                        @endif
                                     @endif
                                 @endif
                             </div>
@@ -147,6 +218,16 @@
                                     @else
                                         <a href="{{ route('rooms.activities.attachment', ['activity' => $activity->id, 'org_slug' => $activity->room->organization->slug ?? '']) }}" target="_blank" style="font-size: 0.8rem; color: var(--accent); font-weight: 600;">View Attachment</a>
                                     @endif
+                                    </div>
+                                </div>
+                            @endif
+
+                            @if($activity->link)
+                                <div style="margin-bottom: 1rem; background: #eef2ff; padding: 0.75rem; border-radius: 0.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                                    <span style="font-size: 1.25rem;">🔗</span>
+                                    <div>
+                                        <p style="font-size: 0.85rem; font-weight: 700; color: #4338ca; margin: 0;">Attached Link</p>
+                                        <a href="{{ $activity->link }}" target="_blank" style="font-size: 0.8rem; color: #4f46e5; font-weight: 600;">Visit External Link</a>
                                     </div>
                                 </div>
                             @endif
@@ -207,7 +288,9 @@
                                 <div>
                                     <h4 style="font-weight: 700; color: var(--brand); margin: 0;">{{ $file->title }}</h4>
                                     <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">
-                                        @if($isPaid || $isTutor || $isAdmin)
+                                        @if($isTutor || $isAdmin)
+                                            {{-- Do not show lock status for the owner/admin --}}
+                                        @elseif($isPaid)
                                             <span style="color: #059669; font-weight: 600;">Unlocked</span>
                                         @elseif($isPending)
                                             <span style="color: #d97706; font-weight: 600;">Pending Confirmation</span>
@@ -297,6 +380,32 @@
                     </div>
                 </div>
             </div>
+
+            @if(($isTutor || $isAdmin) && $room->students->count() > 0)
+                <div style="background: #fff; border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.5rem; margin-top: 1.5rem;">
+                    <h3 style="font-size: 1rem; font-weight: 700; color: var(--brand); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">Enrolled Students</h3>
+                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        @foreach($room->students as $student)
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden;">
+                                    <img src="{{ $student->profile_picture ? asset('storage/' . $student->profile_picture) : 'https://ui-avatars.com/api/?name=' . urlencode($student->name) . '&background=6366f1&color=fff' }}" alt="{{ $student->name }}" style="width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;">
+                                    <div style="overflow: hidden;">
+                                        <p style="font-weight: 700; color: var(--brand); margin: 0; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ $student->name }}</p>
+                                        <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ $student->email }}</p>
+                                    </div>
+                                </div>
+                                <form action="{{ isset($org) ? route('org.rooms.remove-student', [$room->id, $student->id]) : route('rooms.remove-student', [$room->id, $student->id]) }}" method="POST" onsubmit="return confirm('Remove {{ $student->name }} from this classroom?');" style="flex-shrink: 0;">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" title="Remove student" style="background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; border-radius: 0.4rem; padding: 0.2rem 0.5rem; cursor: pointer; font-size: 0.75rem; font-weight: 700; transition: 0.2s;" onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fee2e2'">
+                                        Remove
+                                    </button>
+                                </form>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 </div>
@@ -347,14 +456,62 @@
                 <textarea name="description" rows="3" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem;"></textarea>
             </div>
             <div style="margin-bottom: 1.25rem;">
-                <label style="display: block; font-size: 0.875rem; font-weight: 700; color: var(--brand); margin-bottom: 0.5rem;">Attach Resource (Optional)</label>
+                <label style="display: block; font-size: 0.875rem; font-weight: 700; color: var(--brand); margin-bottom: 0.5rem;">Attach File (PDF/Word, Optional)</label>
                 <input type="file" name="file" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 0.5rem;">
+            </div>
+            <div style="margin-bottom: 1.25rem;">
+                <label style="display: block; font-size: 0.875rem; font-weight: 700; color: var(--brand); margin-bottom: 0.5rem;">Attach Link (Optional)</label>
+                <input type="url" name="link" placeholder="https://" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem;">
             </div>
             <div style="margin-bottom: 1.5rem;">
                 <label style="display: block; font-size: 0.875rem; font-weight: 700; color: var(--brand); margin-bottom: 0.5rem;">Deadline</label>
                 <input type="datetime-local" name="deadline" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem;">
             </div>
+            <div style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" name="allow_late_submissions" id="allow_late" value="1" checked style="width: 1rem; height: 1rem; cursor: pointer;">
+                <label for="allow_late" style="font-size: 0.875rem; font-weight: 600; color: var(--brand); cursor: pointer;">Allow late submissions</label>
+            </div>
             <button type="submit" class="btn btn-brand" style="width: 100%; padding: 0.75rem;">Post Activity</button>
+        </form>
+    </div>
+</div>
+
+{{-- Edit Activity Modal --}}
+<div id="edit-activity-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 50; align-items: center; justify-content: center; padding: 1rem;">
+    <div style="background: #fff; width: 100%; max-width: 500px; border-radius: 1rem; overflow: hidden;">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="font-weight: 800; color: var(--brand); margin: 0;">Edit Activity</h3>
+            <button type="button" onclick="document.getElementById('edit-activity-modal').style.display='none'" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+        </div>
+        <form id="edit-activity-form" method="POST" enctype="multipart/form-data" style="padding: 1.5rem;">
+            @csrf
+            @method('PUT')
+            <div style="margin-bottom: 1.25rem;">
+                <label style="display: block; font-size: 0.875rem; font-weight: 700; color: var(--brand); margin-bottom: 0.5rem;">Activity Title</label>
+                <input type="text" name="title" id="edit_activity_title" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem;">
+            </div>
+            <div style="margin-bottom: 1.25rem;">
+                <label style="display: block; font-size: 0.875rem; font-weight: 700; color: var(--brand); margin-bottom: 0.5rem;">Description</label>
+                <textarea name="description" id="edit_activity_description" rows="3" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem;"></textarea>
+            </div>
+            <div style="margin-bottom: 1.25rem;">
+                <label style="display: block; font-size: 0.875rem; font-weight: 700; color: var(--brand); margin-bottom: 0.5rem;">Replace Attached File (Optional)</label>
+                <input type="file" name="file" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 0.5rem;">
+                <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; margin-bottom: 0;">Leave empty to keep current file.</p>
+            </div>
+            <div style="margin-bottom: 1.25rem;">
+                <label style="display: block; font-size: 0.875rem; font-weight: 700; color: var(--brand); margin-bottom: 0.5rem;">Attach Link (Optional)</label>
+                <input type="url" name="link" id="edit_activity_link" placeholder="https://" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem;">
+            </div>
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: block; font-size: 0.875rem; font-weight: 700; color: var(--brand); margin-bottom: 0.5rem;">Deadline</label>
+                <input type="datetime-local" name="deadline" id="edit_activity_deadline" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem;">
+            </div>
+            <div style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" name="allow_late_submissions" id="edit_allow_late" value="1" style="width: 1rem; height: 1rem; cursor: pointer;">
+                <label for="edit_allow_late" style="font-size: 0.875rem; font-weight: 600; color: var(--brand); cursor: pointer;">Allow late submissions</label>
+            </div>
+            <button type="submit" class="btn btn-brand" style="width: 100%; padding: 0.75rem;">Save Changes</button>
         </form>
     </div>
 </div>
@@ -403,21 +560,89 @@
 
 {{-- Purchase Modal --}}
 <div id="purchase-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 50; align-items: center; justify-content: center; padding: 1rem;">
-    <div style="background: #fff; width: 100%; max-width: 500px; border-radius: 1rem; overflow: hidden;">
-        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="font-weight: 800; color: var(--brand); margin: 0;">Unlock File</h3>
-            <button onclick="document.getElementById('purchase-modal').style.display='none'" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+    <div style="background: #fff; width: 100%; max-width: 480px; border-radius: 1rem; overflow: hidden; max-height: 90vh; overflow-y: auto;">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #00b4d8, #0077b6);">
+            <div>
+                <h3 style="font-weight: 800; color: #fff; margin: 0;">💳 Unlock File</h3>
+                <p id="purchase-file-name" style="color: rgba(255,255,255,0.85); font-size: 0.85rem; margin: 0.25rem 0 0;"></p>
+            </div>
+            <button onclick="document.getElementById('purchase-modal').style.display='none'" style="background: rgba(255,255,255,0.2); border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #fff; font-size: 1.2rem; display: flex; align-items: center; justify-content: center;">&times;</button>
         </div>
-        <div style="padding: 1.5rem; background: #fffbeb;">
-            <p style="margin: 0; font-size: 0.9rem; color: #92400e;">Pay via GCash (0912 345 6789) and upload screenshot.</p>
+
+        {{-- GCash QR Code Section --}}
+        @php
+            $gcashOrg = isset($org) ? $org : (function_exists('tenant') && tenant() ? tenant() : null);
+        @endphp
+        <div style="padding: 1.25rem 1.5rem; background: #f0f9ff; border-bottom: 1px solid #bae6fd;">
+            <p style="font-size: 0.8rem; font-weight: 700; color: #0369a1; margin: 0 0 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">📱 Scan to Pay via GCash</p>
+            @if($gcashOrg && $gcashOrg->gcash_qr_code)
+                <div style="text-align: center;">
+                    @php
+                        $centralDomains = config('tenancy.central_domains', ['localhost']);
+                        $centralDomain  = $centralDomains[0];
+                        $port = request()->getPort();
+                        $portStr = ($port && $port != 80 && $port != 443) ? ':' . $port : '';
+                        $gcashQrUrl = request()->getScheme() . '://' . $centralDomain . $portStr . '/org-qr/' . $gcashOrg->slug;
+                    @endphp
+                    <img src="{{ $gcashQrUrl }}" alt="GCash QR Code" style="max-width: 180px; border-radius: 0.75rem; border: 3px solid #00b4d8; padding: 0.5rem; background: #fff;">
+                    <p style="font-size: 0.8rem; color: #0284c7; font-weight: 600; margin: 0.5rem 0 0;">Scan this QR code with your GCash app to pay</p>
+                </div>
+            @else
+                <div style="text-align: center; padding: 1rem; border: 2px dashed #bae6fd; border-radius: 0.75rem;">
+                    <p style="color: #0284c7; font-size: 0.85rem; font-weight: 600; margin: 0;">No GCash QR Code set yet. Please contact your teacher for payment details.</p>
+                </div>
+            @endif
         </div>
+
+        <div style="padding: 0.75rem 1.5rem; background: #fffbeb; border-bottom: 1px solid #fde68a;">
+            <p style="margin: 0; font-size: 0.85rem; color: #92400e; font-weight: 600;">💡 After paying, upload your screenshot below as proof of payment.</p>
+        </div>
+
         <form id="purchase-form" method="POST" enctype="multipart/form-data" style="padding: 1.5rem;">
             @csrf
             <div style="margin-bottom: 1.5rem;">
-                <label style="display: block; font-size: 0.875rem; font-weight: 700; color: var(--brand); margin-bottom: 0.5rem;">Proof of Payment</label>
-                <input type="file" name="proof_of_payment" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 0.5rem;">
+                <label style="display: block; font-size: 0.875rem; font-weight: 700; color: var(--brand); margin-bottom: 0.5rem;">📎 Upload Screenshot / Proof of Payment</label>
+                <input type="file" name="proof_of_payment" accept="image/*" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 0.5rem;">
             </div>
-            <button type="submit" class="btn btn-accent" style="width: 100%; padding: 0.75rem;">Submit Proof</button>
+            <button type="submit" style="width: 100%; padding: 0.875rem; background: linear-gradient(135deg, #00b4d8, #0077b6); color: #fff; border: none; border-radius: 0.75rem; font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">Submit Proof of Payment</button>
+        </form>
+    </div>
+</div>
+
+
+{{-- Post Announcement Modal --}}
+<div id="announcement-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 50; align-items: center; justify-content: center; padding: 1rem;">
+    <div style="background: #fff; width: 100%; max-width: 500px; border-radius: 1rem; overflow: hidden;">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="font-weight: 800; color: var(--brand); margin: 0;">Post Announcement</h3>
+            <button onclick="document.getElementById('announcement-modal').style.display='none'" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+        </div>
+        <form action="{{ isset($org) ? route('org.rooms.announcements.store', $room->id) : route('rooms.announcements.store', $room->id) }}" method="POST" style="padding: 1.5rem;">
+            @csrf
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: block; font-size: 0.875rem; font-weight: 700; color: var(--brand); margin-bottom: 0.5rem;">Announcement Content</label>
+                <textarea name="content" required rows="5" placeholder="Write your announcement here..." style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem; font-family: inherit;"></textarea>
+            </div>
+            <button type="submit" class="btn btn-brand" style="width: 100%; padding: 0.75rem;">Post Announcement</button>
+        </form>
+    </div>
+</div>
+
+{{-- Edit Announcement Modal --}}
+<div id="edit-announcement-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 50; align-items: center; justify-content: center; padding: 1rem;">
+    <div style="background: #fff; width: 100%; max-width: 500px; border-radius: 1rem; overflow: hidden;">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="font-weight: 800; color: var(--brand); margin: 0;">Edit Announcement</h3>
+            <button type="button" onclick="document.getElementById('edit-announcement-modal').style.display='none'" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+        </div>
+        <form id="edit-announcement-form" method="POST" style="padding: 1.5rem;">
+            @csrf
+            @method('PUT')
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: block; font-size: 0.875rem; font-weight: 700; color: var(--brand); margin-bottom: 0.5rem;">Announcement Content</label>
+                <textarea name="content" id="edit_announcement_content" required rows="5" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem; font-family: inherit;"></textarea>
+            </div>
+            <button type="submit" class="btn btn-brand" style="width: 100%; padding: 0.75rem;">Save Changes</button>
         </form>
     </div>
 </div>
@@ -440,8 +665,96 @@
 
     function openPurchaseModal(fileId, title, price) {
         const form = document.getElementById('purchase-form');
-        form.action = '{{ $purchaseRouteTemplate }}'.replace(':file_id', fileId);
+        const url = '{{ $purchaseRouteTemplate }}'.replace(':file_id', fileId);
+        form.setAttribute('data-action', url);
+        const fileNameEl = document.getElementById('purchase-file-name');
+        if (fileNameEl) fileNameEl.textContent = title + ' \u2014 \u20b1' + parseFloat(price).toFixed(2);
         document.getElementById('purchase-modal').style.display = 'flex';
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('purchase-form');
+        if (!form) return;
+
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const action = form.getAttribute('data-action');
+            if (!action) {
+                alert('Error: No purchase action set. Please close and re-open the modal.');
+                return;
+            }
+
+            const fileInput = form.querySelector('input[name="proof_of_payment"]');
+            if (!fileInput || !fileInput.files.length) {
+                alert('Please select an image file first.');
+                return;
+            }
+
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            const formData = new FormData(form);
+            const token = document.querySelector('meta[name="csrf-token"]')?.content
+                || form.querySelector('input[name="_token"]')?.value;
+
+            try {
+                const headers = { 'Accept': 'application/json' };
+                if (token) headers['X-CSRF-TOKEN'] = token;
+
+                const response = await fetch(action, {
+                    method: 'POST',
+                    headers: headers,
+                    body: formData,
+                });
+
+                if (response.ok) {
+                    document.getElementById('purchase-modal').style.display = 'none';
+                    // Show a success banner
+                    const banner = document.createElement('div');
+                    banner.style = 'position:fixed;top:1rem;right:1rem;background:#ecfdf5;color:#065f46;padding:1rem 1.5rem;border-radius:0.75rem;border:1px solid #a7f3d0;font-weight:700;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.1)';
+                    banner.textContent = '✅ Proof of payment submitted! Waiting for tutor confirmation.';
+                    document.body.appendChild(banner);
+                    setTimeout(() => banner.remove(), 5000);
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    const text = await response.text();
+                    console.error('Server response:', response.status, text);
+                    if (response.status === 419) {
+                        alert('Your session has expired. Please refresh the page and try again.');
+                    } else if (response.status === 422) {
+                        alert('Validation error. Please make sure you selected an image file (jpg, png).');
+                    } else {
+                        alert('An error occurred (HTTP ' + response.status + '). Please try again or refresh the page.');
+                    }
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+            } catch (err) {
+                console.error('Fetch error:', err);
+                alert('Network error. Please check your connection and try again.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+        });
+    });
+
+    function openEditActivityModal(id, title, description, deadline, allowLate, link, actionUrl) {
+        document.getElementById('edit_activity_title').value = title;
+        document.getElementById('edit_activity_description').value = description;
+        document.getElementById('edit_activity_deadline').value = deadline;
+        document.getElementById('edit_allow_late').checked = allowLate == '1';
+        document.getElementById('edit_activity_link').value = link;
+        document.getElementById('edit-activity-form').action = actionUrl;
+        document.getElementById('edit-activity-modal').style.display = 'flex';
+    }
+
+    function openEditAnnouncementModal(id, content, actionUrl) {
+        document.getElementById('edit_announcement_content').value = content;
+        document.getElementById('edit-announcement-form').action = actionUrl;
+        document.getElementById('edit-announcement-modal').style.display = 'flex';
     }
 </script>
 @endsection

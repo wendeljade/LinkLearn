@@ -41,6 +41,12 @@ foreach (config('tenancy.central_domains') as $centralDomain) {
     Route::get('/magic-login/{token}', [\App\Http\Controllers\OrganizationController::class, 'magicLogin'])->name('org.magic.login');
 
     Route::middleware(['auth'])->group(function () {
+        // Notifications
+        Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('org.notifications.index');
+        Route::post('/notifications/{notification}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('org.notifications.read');
+        Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->name('org.notifications.read-all');
+        Route::delete('/notifications/{notification}', [\App\Http\Controllers\NotificationController::class, 'destroy'])->name('org.notifications.destroy');
+
         Route::get('/dashboard', [\App\Http\Controllers\OrganizationController::class, 'dashboard'])->name('org.admin.dashboard');
         Route::get('/settings', [\App\Http\Controllers\OrganizationController::class, 'edit'])->name('org.settings');
         // Auth Routes
@@ -50,8 +56,8 @@ foreach (config('tenancy.central_domains') as $centralDomain) {
         Route::get('/system-update', [\App\Http\Controllers\AdminController::class, 'acknowledgeUpdate'])->name('org.system.update');
         Route::post('/settings', [\App\Http\Controllers\OrganizationController::class, 'update'])->name('org.update');
         Route::get('/rooms', [\App\Http\Controllers\RoomController::class, 'index'])->name('org.rooms.index');
-        Route::get('/rooms/create', [\App\Http\Controllers\RoomController::class, 'create'])->middleware(['role:admin,org_admin,teacher,tutor'])->name('org.rooms.create');
-        Route::post('/rooms', [\App\Http\Controllers\RoomController::class, 'store'])->middleware(['role:admin,org_admin,teacher,tutor'])->name('org.rooms.store');
+        Route::get('/rooms/create', [\App\Http\Controllers\RoomController::class, 'create'])->middleware(['role:admin,org_admin'])->name('org.rooms.create');
+        Route::post('/rooms', [\App\Http\Controllers\RoomController::class, 'store'])->middleware(['role:admin,org_admin'])->name('org.rooms.store');
         Route::get('/rooms/{room}', [\App\Http\Controllers\RoomController::class, 'show'])->name('org.rooms.show');
         Route::put('/rooms/{room}', [\App\Http\Controllers\RoomController::class, 'update'])->name('org.rooms.update');
         Route::post('/rooms/{room}/invite', [\App\Http\Controllers\RoomController::class, 'inviteStudent'])->name('org.rooms.invite');
@@ -68,6 +74,12 @@ foreach (config('tenancy.central_domains') as $centralDomain) {
             ->name('org.rooms.tenant-proof');
         
         Route::post('/rooms/{room}/activities', [\App\Http\Controllers\RoomController::class, 'storeActivity'])->name('org.rooms.activities.store');
+        Route::put('/activities/{activity}', [\App\Http\Controllers\RoomController::class, 'updateActivity'])->name('org.rooms.activities.update');
+        
+        // Announcements
+        Route::post('/rooms/{room}/announcements', [\App\Http\Controllers\RoomController::class, 'storeAnnouncement'])->name('org.rooms.announcements.store');
+        Route::put('/announcements/{announcement}', [\App\Http\Controllers\RoomController::class, 'updateAnnouncement'])->name('org.rooms.announcements.update');
+        Route::delete('/announcements/{announcement}', [\App\Http\Controllers\RoomController::class, 'destroyAnnouncement'])->name('org.rooms.announcements.destroy');
         Route::get('/activities/{activity}/attachment', [\App\Http\Controllers\RoomController::class, 'downloadActivityAttachmentOrg'])->name('org.rooms.activities.attachment');
         Route::delete('/activities/{activity}', [\App\Http\Controllers\RoomController::class, 'destroyActivity'])->name('org.rooms.activities.destroy');
         Route::post('/activities/{activity}/submit', [\App\Http\Controllers\RoomController::class, 'submitActivity'])->name('org.rooms.activities.submit');
@@ -75,6 +87,9 @@ foreach (config('tenancy.central_domains') as $centralDomain) {
         Route::post('/rooms/{room}/archive', [\App\Http\Controllers\RoomController::class, 'archive'])->name('org.rooms.archive');
         Route::post('/rooms/{room}/unarchive', [\App\Http\Controllers\RoomController::class, 'unarchive'])->name('org.rooms.unarchive');
         Route::post('/rooms/{room}/join', [\App\Http\Controllers\RoomController::class, 'join'])->name('org.rooms.join');
+        Route::post('/rooms/{room}/approve-student/{student}', [\App\Http\Controllers\RoomController::class, 'approveJoin'])->name('org.rooms.approve-student');
+        Route::post('/rooms/{room}/reject-student/{student}', [\App\Http\Controllers\RoomController::class, 'rejectJoin'])->name('org.rooms.reject-student');
+        Route::delete('/rooms/{room}/remove-student/{student}', [\App\Http\Controllers\RoomController::class, 'removeStudent'])->name('org.rooms.remove-student');
         Route::get('/team', [\App\Http\Controllers\OrganizationController::class, 'team'])->name('org.team');
         Route::post('/team/invite', [\App\Http\Controllers\OrganizationController::class, 'invite'])->name('org.team.invite');
         Route::get('/archived', [\App\Http\Controllers\RoomController::class, 'archived'])->name('org.rooms.archived');
@@ -84,6 +99,9 @@ foreach (config('tenancy.central_domains') as $centralDomain) {
         Route::post('/support', [\App\Http\Controllers\SupportTicketController::class, 'store'])->name('org.support.store');
         Route::get('/support/{id}', [\App\Http\Controllers\SupportTicketController::class, 'show'])->name('org.support.show');
         Route::post('/support/{id}/reply', [\App\Http\Controllers\SupportTicketController::class, 'reply'])->name('org.support.reply');
+
+        // GCash QR Code
+        Route::post('/gcash-qr', [\App\Http\Controllers\OrganizationController::class, 'uploadGcashQr'])->name('org.gcash.upload');
 
         // Tenant Logout: Clear tenant session, then redirect to central logout to clear central session
         Route::post('/logout', function (\Illuminate\Http\Request $request) {

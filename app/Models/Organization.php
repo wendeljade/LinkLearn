@@ -75,9 +75,11 @@ class Organization extends BaseTenant implements TenantWithDatabase
             'slug',
             'description',
             'cover_photo',
+            'gcash_qr_code',
             'status',
             'subscription_paid_at',
             'proof_of_payment',
+            'total_payments_made',
             'created_at',
             'updated_at',
         ];
@@ -92,9 +94,11 @@ class Organization extends BaseTenant implements TenantWithDatabase
         'slug',
         'description',
         'cover_photo',
+        'gcash_qr_code',
         'status',
         'subscription_paid_at',
         'proof_of_payment',
+        'total_payments_made',
     ];
 
     protected $casts = [
