@@ -104,7 +104,7 @@
                         @foreach($pendingStudents as $student)
                             <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #fef3c7; border-radius: 0.5rem;">
                                 <div style="display: flex; align-items: center; gap: 1rem;">
-                                    <img src="{{ $student->avatar ?? 'https://ui-avatars.com/api/?name='.urlencode($student->name) }}" alt="{{ $student->name }}" style="width: 40px; height: 40px; border-radius: 50%;">
+                                    <img src="{{ $student->avatar ?: 'https://ui-avatars.com/api/?name='.urlencode($student->name) }}" alt="{{ $student->name }}" style="width: 40px; height: 40px; border-radius: 50%;">
                                     <div>
                                         <p style="font-weight: 700; color: var(--brand); margin: 0;">{{ $student->name }}</p>
                                         <p style="font-size: 0.8rem; color: #92400e; margin: 0;">{{ $student->email }}</p>
@@ -336,7 +336,7 @@
                             @foreach($pendingPurchases as $pending)
                                 <div style="border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem; display: flex; justify-content: space-between; align-items: center;">
                                     <div style="display: flex; align-items: center; gap: 1rem;">
-                                        <img src="{{ $pending->user->avatar ?? 'https://ui-avatars.com/api/?name=' . urlencode($pending->user->name) }}" style="width: 40px; height: 40px; border-radius: 50%;">
+                                        <img src="{{ $pending->user->avatar ?: 'https://ui-avatars.com/api/?name=' . urlencode($pending->user->name) }}" style="width: 40px; height: 40px; border-radius: 50%;">
                                         <div>
                                             <h4 style="font-weight: 700; color: var(--brand); margin: 0;">{{ $pending->user->name }}</h4>
                                             <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">Purchased: {{ $pending->file->title }}</p>
@@ -388,7 +388,7 @@
                         @foreach($room->students as $student)
                             <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
                                 <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden;">
-                                    <img src="{{ $student->profile_picture ? asset('storage/' . $student->profile_picture) : 'https://ui-avatars.com/api/?name=' . urlencode($student->name) . '&background=6366f1&color=fff' }}" alt="{{ $student->name }}" style="width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;">
+                                    <img src="{{ $student->avatar ?: 'https://ui-avatars.com/api/?name=' . urlencode($student->name) . '&background=6366f1&color=fff' }}" alt="{{ $student->name }}" style="width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;">
                                     <div style="overflow: hidden;">
                                         <p style="font-weight: 700; color: var(--brand); margin: 0; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ $student->name }}</p>
                                         <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ $student->email }}</p>
@@ -584,7 +584,7 @@
                         $portStr = ($port && $port != 80 && $port != 443) ? ':' . $port : '';
                         $gcashQrUrl = request()->getScheme() . '://' . $centralDomain . $portStr . '/org-qr/' . $gcashOrg->slug;
                     @endphp
-                    <img src="{{ $gcashQrUrl }}" alt="GCash QR Code" style="max-width: 180px; border-radius: 0.75rem; border: 3px solid #00b4d8; padding: 0.5rem; background: #fff;">
+                    <img src="{{ $gcashQrUrl }}?v={{ time() }}" alt="GCash QR Code" style="max-width: 180px; border-radius: 0.75rem; border: 3px solid var(--accent); padding: 0.5rem; background: #fff;">
                     <p style="font-size: 0.8rem; color: #0284c7; font-weight: 600; margin: 0.5rem 0 0;">Scan this QR code with your GCash app to pay</p>
                 </div>
             @else

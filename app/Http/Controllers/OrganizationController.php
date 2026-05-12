@@ -158,7 +158,7 @@ class OrganizationController extends Controller
     {
         $org = tenant();
         
-        if ($org->user_id !== auth()->id()) {
+        if (auth()->user()->role !== 'org_admin' && !auth()->user()->isAdmin()) {
             abort(403);
         }
 
@@ -170,7 +170,7 @@ class OrganizationController extends Controller
     {
         $org = tenant();
 
-        if ($org->user_id !== auth()->id()) {
+        if (auth()->user()->role !== 'org_admin' && !auth()->user()->isAdmin()) {
             abort(403);
         }
 
@@ -203,7 +203,7 @@ class OrganizationController extends Controller
     {
         $org = tenant();
 
-        if ($org->user_id !== auth()->id() && !auth()->user()->isAdmin()) {
+        if (auth()->user()->role !== 'org_admin' && !auth()->user()->isAdmin()) {
             abort(403);
         }
 

@@ -216,7 +216,7 @@
                     <div class="user-dropdown">
                     <button class="dropdown-trigger" id="profileBtn">
                         <span style="font-weight: 700; font-size: 0.8rem; text-transform: uppercase;">{{ auth()->user()->name }}</span>
-                        <img src="{{ auth()->user()->avatar ?? 'https://ui-avatars.com/api/?name=' . urlencode(auth()->user()->name) . '&background=f59e0b&color=0f172a' }}" alt="Avatar" class="avatar">
+                        <img src="{{ auth()->user()->avatar ?: 'https://ui-avatars.com/api/?name=' . urlencode(auth()->user()->name) . '&background=f59e0b&color=0f172a' }}" alt="Avatar" class="avatar">
                     </button>
                     <div class="dropdown-menu" id="profileMenu">
                         <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); margin-bottom: 0.25rem;">
@@ -255,12 +255,15 @@
 
         <footer class="app-footer">
             &copy; {{ date('Y') }} LinkLearn. All rights reserved.
+            @auth
             @if(isset($currentVersion))
                 <span style="margin-left: 0.5rem;">Version: <strong style="color: var(--brand);" id="footerVersion">{{ $currentVersion }}</strong></span>
             @endif
+            @endauth
         </footer>
     </div>
 
+    @auth
     @if(isset($appVersion) && isset($currentVersion))
     <div class="update-modal-overlay" id="updateModal">
         <div class="update-modal">
@@ -301,6 +304,7 @@
         </div>
     </div>
     @endif
+    @endauth
 
     <script>
         const profileBtn = document.getElementById('profileBtn');
@@ -359,7 +363,7 @@
                         $portStr = ($port && $port != 80 && $port != 443) ? ':' . $port : '';
                         $qrUrl = request()->getScheme() . '://' . $centralDomain . $portStr . '/org-qr/' . $gcashOrg->slug;
                     @endphp
-                    <img src="{{ $qrUrl }}" alt="GCash QR Code" style="max-width: 200px; border-radius: 0.75rem; border: 3px solid var(--accent); padding: 0.5rem;">
+                    <img src="{{ $qrUrl }}?v={{ time() }}" alt="GCash QR Code" style="max-width: 200px; border-radius: 0.75rem; border: 3px solid var(--accent); padding: 0.5rem;">
                 </div>
             @else
                 <div style="border: 2px dashed #e2e8f0; border-radius: 0.75rem; padding: 2rem; text-align: center; margin-bottom: 1.25rem;">

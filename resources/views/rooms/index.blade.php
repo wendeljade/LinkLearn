@@ -48,7 +48,7 @@
                     </div>
                     
                     {{-- Teacher Avatar with Accent Border --}}
-                    <img src="{{ $room->tutor?->avatar ?? 'https://ui-avatars.com/api/?name=' . urlencode($room->tutor?->name ?? 'N/A') . '&background=0f172a&color=fff' }}" 
+                    <img src="{{ $room->tutor?->avatar ?: 'https://ui-avatars.com/api/?name=' . urlencode($room->tutor?->name ?? 'N/A') . '&background=0f172a&color=fff' }}" 
                          style="width: 70px; height: 70px; border-radius: 50%; border: 3px solid var(--accent); position: absolute; right: 1.25rem; bottom: -35px; z-index: 3; object-fit: cover; background: #fff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
                 </div>
 

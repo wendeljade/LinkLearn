@@ -279,10 +279,9 @@ public function allExploreRooms(): \Illuminate\Support\Collection
                     $roomModel->setRelation('tutor', $tutor);
                 }
 
-                // Don't add if already fetched via central (avoids duplication if sync exists)
-                if (!$allRooms->contains('id', $roomModel->id)) {
-                    $allRooms->push($roomModel);
-                }
+                // Add the room to the collection.
+                // We do NOT use contains('id') because IDs overlap across different databases.
+                $allRooms->push($roomModel);
             }
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::warning('allExploreRooms: skipping tenant ' . $org->slug, [

@@ -37,7 +37,7 @@
                             </button>
                         </form>
 
-                        <img src="{{ auth()->user()->avatar ?? 'https://ui-avatars.com/api/?name=' . urlencode($org->name) . '&background=f59e0b&color=0f172a' }}" style="position: absolute; bottom: -24px; right: 20px; width: 64px; height: 64px; border-radius: 50%; border: 4px solid #fff; box-shadow: var(--shadow); object-fit: cover;">
+                        <img src="{{ auth()->user()->avatar ?: 'https://ui-avatars.com/api/?name=' . urlencode($org->name) . '&background=f59e0b&color=0f172a' }}" style="position: absolute; bottom: -24px; right: 20px; width: 64px; height: 64px; border-radius: 50%; border: 4px solid #fff; box-shadow: var(--shadow); object-fit: cover;">
                     </div>
                     
                     <div style="padding: 2.5rem 1.5rem 1.5rem; flex-grow: 1; display: flex; flex-direction: column;">
