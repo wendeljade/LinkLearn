@@ -251,6 +251,13 @@
             } else {
                 $currentVersion = \Illuminate\Support\Facades\Cache::get('central_version', 'v1.0.0');
             }
+
+            $hasNewUpdate = false;
+            if (isset($appVersion) && isset($currentVersion)) {
+                $cleanAppVer = ltrim($appVersion, 'vV.');
+                $cleanCurVer = ltrim($currentVersion, 'vV.');
+                $hasNewUpdate = version_compare($cleanAppVer, $cleanCurVer, '>');
+            }
         @endphp
 
         <footer class="app-footer">
@@ -270,7 +277,7 @@
             <div class="update-icon">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
             </div>
-            @if($appVersion !== $currentVersion)
+            @if($hasNewUpdate)
                 <h3 class="update-title">New Update Available!</h3>
                 <p class="update-desc">
                     We've just released <span class="update-version" id="updateVersionDisplay">{{ $appVersion }}</span>. <br>Enjoy the new features and improvements!
@@ -319,12 +326,12 @@
 
         const updateModal = document.getElementById('updateModal');
         const updateLaterBtn = document.getElementById('updateLaterBtn');
-        const currentVersion = "{{ $appVersion ?? 'v1.0.0' }}";
-        const isUpdateAvailable = {{ (isset($appVersion) && isset($currentVersion) && $appVersion !== $currentVersion) ? 'true' : 'false' }};
+        const currentAppVersion = "{{ $appVersion ?? 'v1.0.0' }}";
+        const isUpdateAvailable = {{ $hasNewUpdate ? 'true' : 'false' }};
 
         if (updateModal && isUpdateAvailable) {
             const localDismissed = localStorage.getItem('linklearn_update_dismissed');
-            if (localDismissed !== currentVersion) {
+            if (localDismissed !== currentAppVersion) {
                 setTimeout(() => {
                     updateModal.classList.add('show');
                 }, 500);
@@ -333,7 +340,7 @@
 
         if (updateLaterBtn) {
             updateLaterBtn.addEventListener('click', () => {
-                localStorage.setItem('linklearn_update_dismissed', currentVersion);
+                localStorage.setItem('linklearn_update_dismissed', currentAppVersion);
                 updateModal.classList.remove('show');
             });
         }

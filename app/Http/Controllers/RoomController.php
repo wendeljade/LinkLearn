@@ -769,7 +769,7 @@ class RoomController extends Controller
             : route('rooms.show', $submission->activity->room_id);
 
         \App\Models\Notification::create([
-            'user_id' => $submission->user_id,
+            'user_id' => $submission->student_id,
             'type' => 'submission_graded',
             'title' => 'Activity Graded',
             'message' => 'Your submission for "' . $submission->activity->title . '" has been graded: ' . $request->grade,
